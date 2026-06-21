@@ -1,387 +1,434 @@
 /**
- * 志工／老師選班系統安全後端
+ * 志工／老師選班系統 Apps Script 後端
  *
- * 用法：
- * 1. 到 Google 試算表：擴充功能 → Apps Script。
- * 2. 貼上本檔內容。
- * 3. 修改 ADMIN_TOKEN。
- * 4. 執行 setupBackend 一次，授權。
- * 5. 部署 → 新增部署作業 → 網路應用程式。
- *    執行身分：我
- *    存取權：知道連結的任何人
- * 6. 把 Web App URL 貼回 GitHub Pages 前端。
+ * 使用方式：
+ * 1. 打開目標 Google 試算表。
+ * 2. 擴充功能 → Apps Script。
+ * 3. 貼上本檔內容。
+ * 4. 先執行 setupSystem()，授權後會建立 Teachers / Shifts / Selections / SwapRequests。
+ * 5. 可再執行 importTeachersFromWorkbook()，自動從既有工作表找「學號、姓名」匯入 Teachers。
+ * 6. 部署 → 新增部署作業 → 網頁應用程式。
+ *    - 執行身分：我
+ *    - 誰可以存取：任何人
+ * 7. 複製 Web app URL，貼到前端 app.js 的 API_URL。
  */
 
 const CONFIG = {
   SPREADSHEET_ID: '1te6Eql2eBh7l4JgFb-fOuHmmH-mtWdpc',
-  ADMIN_TOKEN: 'CHANGE_ME_ADMIN_TOKEN',
-  SHEET_TEACHERS: 'Teachers',
-  SHEET_SHIFTS: 'Shifts',
-  SHEET_SELECTIONS: 'Selections'
+  SHEETS: {
+    TEACHERS: 'Teachers',
+    SHIFTS: 'Shifts',
+    SELECTIONS: 'Selections',
+    SWAPS: 'SwapRequests'
+  }
 };
 
 const HEADERS = {
-  teachers: ['teacher_id', 'display_name', 'email', 'active'],
-  shifts: ['shift_id', 'date', 'duty', 'time', 'report_time', 'place', 'quota', 'visible'],
-  selections: ['selection_id', 'teacher_id', 'shift_id', 'confirmed', 'selected_at', 'confirmed_at']
+  Teachers: ['teacherId', 'name', 'active', 'phone', 'email', 'note'],
+  Shifts: ['shiftId', 'date', 'weekday', 'site', 'duty', 'startTime', 'endTime', 'reportTime', 'quota', 'status', 'note'],
+  Selections: ['selectionId', 'teacherId', 'teacherName', 'shiftId', 'confirmed', 'selectedAt', 'confirmedAt', 'note'],
+  SwapRequests: ['requestId', 'teacherId', 'teacherName', 'originalShiftId', 'desiredShiftId', 'note', 'status', 'createdAt']
 };
 
 function doGet(e) {
-  const params = (e && e.parameter) || {};
-  const action = params.action || 'status';
+  return handleRequest_(e);
+}
+
+function doPost(e) {
+  return handleRequest_(e);
+}
+
+function handleRequest_(e) {
+  const params = normalizeParams_(e);
+  const action = params.action || 'getPublicData';
+  const callback = params.callback || '';
 
   try {
-    if (action === 'status') return json_({ ok: true, message: 'API 正常' });
-    if (action === 'setup') return json_(setupBackend_(params));
-    if (action === 'importTeachers') return json_(importTeachersFromRoster_(params));
-    if (action === 'query') return json_(queryTeacher_(params));
-    if (action === 'select') return json_(selectShift_(params));
-    if (action === 'confirm') return json_(confirmSelection_(params));
-    if (action === 'admin') return json_(adminReport_(params));
+    let data;
 
-    return json_({ ok: false, error: '未知 action：' + action });
+    switch (action) {
+      case 'setup':
+        data = setupSystem();
+        break;
+      case 'importTeachers':
+        data = importTeachersFromWorkbook();
+        break;
+      case 'getPublicData':
+      case 'list':
+        data = getPublicData();
+        break;
+      case 'lookupTeacher':
+        data = lookupTeacher(params.query || params.teacherKey || '');
+        break;
+      case 'selectShift':
+      case 'select':
+        data = selectShift(params.teacherKey || params.teacherId || params.name || '', params.shiftId || '');
+        break;
+      case 'confirmShift':
+      case 'confirm':
+        data = confirmShift(params.teacherKey || params.teacherId || params.name || '', params.shiftId || '', params.selectionId || '');
+        break;
+      case 'requestSwap':
+      case 'swap':
+        data = requestSwap(
+          params.teacherKey || params.teacherId || params.name || '',
+          params.originalShiftId || '',
+          params.desiredShiftId || '',
+          params.note || ''
+        );
+        break;
+      default:
+        throw new Error('Unknown action: ' + action);
+    }
+
+    return jsonResponse_({ ok: true, action, data }, callback);
   } catch (error) {
-    return json_({ ok: false, error: String(error && error.message ? error.message : error) });
+    return jsonResponse_({ ok: false, action, error: String(error.message || error) }, callback);
   }
 }
 
-function setupBackend() {
-  return setupBackend_({ token: CONFIG.ADMIN_TOKEN });
-}
+function setupSystem() {
+  const ss = getSpreadsheet_();
+  const teachersSheet = ensureSheet_(ss, CONFIG.SHEETS.TEACHERS, HEADERS.Teachers);
+  const shiftsSheet = ensureSheet_(ss, CONFIG.SHEETS.SHIFTS, HEADERS.Shifts);
+  ensureSheet_(ss, CONFIG.SHEETS.SELECTIONS, HEADERS.Selections);
+  ensureSheet_(ss, CONFIG.SHEETS.SWAPS, HEADERS.SwapRequests);
 
-function setupBackend_(params) {
-  requireAdmin_(params);
-  const ss = openSpreadsheet_();
-  ensureSheet_(ss, CONFIG.SHEET_TEACHERS, HEADERS.teachers);
-  ensureSheet_(ss, CONFIG.SHEET_SHIFTS, HEADERS.shifts);
-  ensureSheet_(ss, CONFIG.SHEET_SELECTIONS, HEADERS.selections);
-
-  const shiftSheet = ss.getSheetByName(CONFIG.SHEET_SHIFTS);
-  if (shiftSheet.getLastRow() === 1) {
-    shiftSheet.getRange(2, 1, 5, HEADERS.shifts.length).setValues([
-      ['S001', '2026/07/05（日）', 'A哨上午班', '09:00－12:00', '08:50', 'A哨', 1, true],
-      ['S002', '2026/07/05（日）', 'A哨下午班', '12:00－13:30', '11:50', 'A哨', 1, true],
-      ['S003', '2026/07/06（一）', '導覽第 1 梯', '09:00－09:30', '08:50', '導覽集合處', 2, true],
-      ['S004', '2026/07/06（一）', '導覽第 3 梯', '10:00－10:30', '09:50', '導覽集合處', 2, true],
-      ['S005', '2026/07/07（二）', '留守支援', '09:00－12:00', '08:50', '遊客中心', 1, true]
+  if (teachersSheet.getLastRow() <= 1) {
+    teachersSheet.getRange(2, 1, 3, HEADERS.Teachers.length).setValues([
+      ['T001', '王老師', true, '', '', '示範資料'],
+      ['T002', '陳老師', true, '', '', '示範資料'],
+      ['T003', '林老師', true, '', '', '示範資料']
     ]);
   }
 
-  return { ok: true, message: '後端工作表已建立完成' };
+  if (shiftsSheet.getLastRow() <= 1) {
+    shiftsSheet.getRange(2, 1, 8, HEADERS.Shifts.length).setValues([
+      ['S001', '2026/07/05', '日', 'A點', 'A點上午班', '09:00', '13:00', '08:50', 1, 'open', ''],
+      ['S002', '2026/07/05', '日', 'A點', 'A點下午班', '12:00', '16:00', '11:50', 1, 'open', ''],
+      ['S003', '2026/07/05', '日', '慈湖遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
+      ['S004', '2026/07/05', '日', '慈湖遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
+      ['S005', '2026/07/05', '日', '北橫遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
+      ['S006', '2026/07/05', '日', '北橫遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
+      ['S007', '2026/07/06', '一', '導覽', '導覽第1梯', '08:45', '09:15', '08:35', 1, 'open', ''],
+      ['S008', '2026/07/06', '一', '導覽', '導覽第3梯', '09:45', '10:15', '09:35', 1, 'open', '']
+    ]);
+  }
+
+  formatSystemSheets_();
+  return { message: 'setup completed', spreadsheetUrl: ss.getUrl() };
 }
 
-function importTeachersFromRoster_(params) {
-  requireAdmin_(params);
-  setupBackend_(params);
+function importTeachersFromWorkbook() {
+  setupSystem();
 
-  const ss = openSpreadsheet_();
-  const teacherSheet = ss.getSheetByName(CONFIG.SHEET_TEACHERS);
-  const existing = new Set(readObjects_(teacherSheet).map(row => String(row.teacher_id)));
-  const roster = scanRoster_(ss);
-  const rowsToAppend = [];
+  const ss = getSpreadsheet_();
+  const target = ss.getSheetByName(CONFIG.SHEETS.TEACHERS);
+  const existing = tableToObjects_(target);
+  const existingIds = new Set(existing.map((row) => String(row.teacherId)));
+  const newRows = [];
 
-  roster.forEach(person => {
-    if (!existing.has(person.teacher_id)) {
-      rowsToAppend.push([person.teacher_id, person.display_name, '', true]);
-      existing.add(person.teacher_id);
+  ss.getSheets().forEach((sheet) => {
+    if (Object.values(CONFIG.SHEETS).includes(sheet.getName())) return;
+
+    const values = sheet.getDataRange().getDisplayValues();
+    for (let r = 0; r < values.length; r++) {
+      for (let c = 0; c < values[r].length - 1; c++) {
+        const first = normalizeText_(values[r][c]);
+        const second = normalizeText_(values[r][c + 1]);
+        if (first === '學號' && second === '姓名') {
+          for (let i = r + 1; i < values.length; i++) {
+            const id = normalizeText_(values[i][c]);
+            const name = normalizeText_(values[i][c + 1]);
+            if (!id && !name) break;
+            if (!id || !name) continue;
+            if (id === '休園' || name === '休園' || name === '無名額') continue;
+            if (existingIds.has(id)) continue;
+            existingIds.add(id);
+            newRows.push([id, name, true, '', '', '由 ' + sheet.getName() + ' 匯入']);
+          }
+        }
+      }
     }
   });
 
-  if (rowsToAppend.length > 0) {
-    teacherSheet.getRange(teacherSheet.getLastRow() + 1, 1, rowsToAppend.length, HEADERS.teachers.length).setValues(rowsToAppend);
+  if (newRows.length > 0) {
+    target.getRange(target.getLastRow() + 1, 1, newRows.length, HEADERS.Teachers.length).setValues(newRows);
   }
 
+  return { imported: newRows.length, totalTeachers: tableToObjects_(target).length };
+}
+
+function getPublicData() {
+  setupSystem();
+
+  const ss = getSpreadsheet_();
+  const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS))
+    .filter((row) => String(row.active).toLowerCase() !== 'false');
+  const shifts = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS))
+    .filter((row) => String(row.status || 'open').toLowerCase() !== 'closed');
+  const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
+  const swaps = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SWAPS));
+
+  const selectionMap = groupBy_(selections, 'shiftId');
+  const shiftsWithState = shifts.map((shift) => {
+    const selected = selectionMap[shift.shiftId] || [];
+    const quota = Number(shift.quota || 1);
+    return {
+      ...shift,
+      quota,
+      selectedCount: selected.length,
+      remaining: Math.max(quota - selected.length, 0),
+      selectedPeople: selected.map((item) => ({
+        teacherId: item.teacherId,
+        teacherName: item.teacherName,
+        confirmed: String(item.confirmed).toLowerCase() === 'true'
+      }))
+    };
+  });
+
   return {
-    ok: true,
-    message: '已匯入 ' + rowsToAppend.length + ' 位人員；略過已存在 ' + (roster.length - rowsToAppend.length) + ' 位。'
+    teachers,
+    shifts: shiftsWithState,
+    selections,
+    swaps,
+    generatedAt: new Date().toISOString()
   };
 }
 
-function queryTeacher_(params) {
-  setupBackend_({ token: CONFIG.ADMIN_TOKEN });
+function lookupTeacher(query) {
+  const teacher = findTeacher_(query);
+  if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-  const code = clean_(params.q || params.teacher_id || '');
-  if (!code) throw new Error('請輸入個人代碼。');
-
-  const teacher = getTeacherById_(code);
-  if (!teacher) throw new Error('查無此代碼，請確認是否輸入正確。');
-  if (!isTruthy_(teacher.active)) throw new Error('此代碼目前未啟用。');
+  const ss = getSpreadsheet_();
+  const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS))
+    .filter((row) => String(row.teacherId) === String(teacher.teacherId));
+  const shifts = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS));
+  const shiftById = keyBy_(shifts, 'shiftId');
 
   return {
-    ok: true,
-    teacher: publicTeacher_(teacher),
-    selections: getSelectionsForTeacher_(teacher.teacher_id),
-    availableShifts: getAvailableShifts_()
+    teacher,
+    selections: selections.map((selection) => ({
+      ...selection,
+      shift: shiftById[selection.shiftId] || null
+    }))
   };
 }
 
-function selectShift_(params) {
+function selectShift(teacherKey, shiftId) {
+  if (!teacherKey) throw new Error('請輸入學號或姓名。');
+  if (!shiftId) throw new Error('缺少 shiftId。');
+
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(8000);
 
   try {
-    setupBackend_({ token: CONFIG.ADMIN_TOKEN });
+    setupSystem();
+    const ss = getSpreadsheet_();
+    const teacher = findTeacher_(teacherKey);
+    if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-    const teacherId = clean_(params.teacher_id || '');
-    const shiftId = clean_(params.shift_id || '');
-    if (!teacherId || !shiftId) throw new Error('缺少 teacher_id 或 shift_id。');
-
-    const teacher = getTeacherById_(teacherId);
-    const shift = getShiftById_(shiftId);
-    if (!teacher) throw new Error('查無此人員代碼。');
+    const shiftsSheet = ss.getSheetByName(CONFIG.SHEETS.SHIFTS);
+    const selectionsSheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
+    const shifts = tableToObjects_(shiftsSheet);
+    const shift = shifts.find((row) => String(row.shiftId) === String(shiftId));
     if (!shift) throw new Error('查無此班別。');
-    if (!isTruthy_(shift.visible)) throw new Error('此班別目前未開放。');
+    if (String(shift.status || 'open').toLowerCase() === 'closed') throw new Error('這個班別已關閉。');
 
-    const selectedCount = getSelectedCount_(shiftId);
-    const quota = Number(shift.quota || 0);
-    if (selectedCount >= quota) throw new Error('此班別已額滿。');
+    const selections = tableToObjects_(selectionsSheet);
+    if (selections.some((row) => String(row.teacherId) === String(teacher.teacherId) && String(row.shiftId) === String(shiftId))) {
+      throw new Error('你已經選過這一班。');
+    }
 
-    const ss = openSpreadsheet_();
-    const sheet = ss.getSheetByName(CONFIG.SHEET_SELECTIONS);
-    const existing = readObjects_(sheet).some(row => {
-      return clean_(row.teacher_id) === teacherId && clean_(row.shift_id) === shiftId;
-    });
-    if (existing) throw new Error('你已經選過這一班。');
+    const selectedCount = selections.filter((row) => String(row.shiftId) === String(shiftId)).length;
+    const quota = Number(shift.quota || 1);
+    if (selectedCount >= quota) throw new Error('這個班別已額滿。');
 
-    const selectionId = Utilities.getUuid();
-    sheet.appendRow([selectionId, teacherId, shiftId, false, new Date(), '']);
+    const selectionId = 'SEL-' + Utilities.getUuid().slice(0, 8);
+    selectionsSheet.appendRow([
+      selectionId,
+      teacher.teacherId,
+      teacher.name,
+      shift.shiftId,
+      false,
+      new Date(),
+      '',
+      ''
+    ]);
 
     return {
-      ok: true,
-      message: '選班成功，請記得按「我知道了」。',
-      teacher: publicTeacher_(teacher),
-      selections: getSelectionsForTeacher_(teacherId),
-      availableShifts: getAvailableShifts_()
+      selectionId,
+      teacherId: teacher.teacherId,
+      teacherName: teacher.name,
+      shiftId: shift.shiftId,
+      message: '選班成功，請記得按「我知道了」。'
     };
   } finally {
     lock.releaseLock();
   }
 }
 
-function confirmSelection_(params) {
-  setupBackend_({ token: CONFIG.ADMIN_TOKEN });
+function confirmShift(teacherKey, shiftId, selectionId) {
+  if (!teacherKey && !selectionId) throw new Error('請輸入學號／姓名，或提供 selectionId。');
 
-  const teacherId = clean_(params.teacher_id || '');
-  const selectionId = clean_(params.selection_id || '');
-  if (!teacherId || !selectionId) throw new Error('缺少 teacher_id 或 selection_id。');
-
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_SELECTIONS);
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
   const values = sheet.getDataRange().getValues();
-  const headers = values[0].map(String);
-  const idCol = headers.indexOf('selection_id');
-  const teacherCol = headers.indexOf('teacher_id');
-  const confirmedCol = headers.indexOf('confirmed');
-  const confirmedAtCol = headers.indexOf('confirmed_at');
+  const headers = values[0];
+  const index = headerIndex_(headers);
+  const teacher = teacherKey ? findTeacher_(teacherKey) : null;
 
-  for (let i = 1; i < values.length; i += 1) {
-    if (clean_(values[i][idCol]) === selectionId && clean_(values[i][teacherCol]) === teacherId) {
-      sheet.getRange(i + 1, confirmedCol + 1).setValue(true);
-      sheet.getRange(i + 1, confirmedAtCol + 1).setValue(new Date());
-      return {
-        ok: true,
-        message: '已確認收到提醒。',
-        selections: getSelectionsForTeacher_(teacherId),
-        availableShifts: getAvailableShifts_()
-      };
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r];
+    const matchedBySelectionId = selectionId && String(row[index.selectionId]) === String(selectionId);
+    const matchedByTeacherAndShift = teacher && String(row[index.teacherId]) === String(teacher.teacherId) && String(row[index.shiftId]) === String(shiftId);
+
+    if (matchedBySelectionId || matchedByTeacherAndShift) {
+      sheet.getRange(r + 1, index.confirmed + 1).setValue(true);
+      sheet.getRange(r + 1, index.confirmedAt + 1).setValue(new Date());
+      return { message: '已確認收到提醒。' };
     }
   }
 
-  throw new Error('查無此選班紀錄，或代碼不符。');
+  throw new Error('找不到要確認的選班紀錄。');
 }
 
-function adminReport_(params) {
-  requireAdmin_(params);
-  setupBackend_(params);
+function requestSwap(teacherKey, originalShiftId, desiredShiftId, note) {
+  if (!teacherKey) throw new Error('請輸入學號或姓名。');
+  if (!originalShiftId) throw new Error('請選擇原本的班。');
 
-  const teachers = readObjects_(openSpreadsheet_().getSheetByName(CONFIG.SHEET_TEACHERS));
-  const teacherMap = new Map(teachers.map(row => [clean_(row.teacher_id), row]));
-  const selections = readObjects_(openSpreadsheet_().getSheetByName(CONFIG.SHEET_SELECTIONS));
+  setupSystem();
+  const teacher = findTeacher_(teacherKey);
+  if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-  return {
-    ok: true,
-    selections: selections.map(row => {
-      const teacher = teacherMap.get(clean_(row.teacher_id));
-      const shift = getShiftById_(row.shift_id) || {};
-      return {
-        selection_id: row.selection_id,
-        teacher_id: row.teacher_id,
-        display_name: teacher ? teacher.display_name : '',
-        shift_id: row.shift_id,
-        date: shift.date || '',
-        duty: shift.duty || '',
-        time: shift.time || '',
-        place: shift.place || '',
-        confirmed: isTruthy_(row.confirmed),
-        selected_at: row.selected_at || '',
-        confirmed_at: row.confirmed_at || ''
-      };
-    })
-  };
+  const ss = getSpreadsheet_();
+  const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
+  const hasOriginal = selections.some((row) => String(row.teacherId) === String(teacher.teacherId) && String(row.shiftId) === String(originalShiftId));
+  if (!hasOriginal) throw new Error('你沒有選這個原班別，不能申請換班。');
+
+  const requestId = 'SWAP-' + Utilities.getUuid().slice(0, 8);
+  ss.getSheetByName(CONFIG.SHEETS.SWAPS).appendRow([
+    requestId,
+    teacher.teacherId,
+    teacher.name,
+    originalShiftId,
+    desiredShiftId || '',
+    note || '',
+    'open',
+    new Date()
+  ]);
+
+  return { requestId, message: '已建立換班申請。' };
 }
 
-function getSelectionsForTeacher_(teacherId) {
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_SELECTIONS);
-  return readObjects_(sheet)
-    .filter(row => clean_(row.teacher_id) === clean_(teacherId))
-    .map(row => {
-      const shift = getShiftById_(row.shift_id) || {};
-      return {
-        selection_id: row.selection_id,
-        shift_id: row.shift_id,
-        date: shift.date || '',
-        duty: shift.duty || '',
-        time: shift.time || '',
-        report_time: shift.report_time || '',
-        place: shift.place || '',
-        confirmed: isTruthy_(row.confirmed),
-        selected_at: row.selected_at || '',
-        confirmed_at: row.confirmed_at || ''
-      };
-    });
+function findTeacher_(query) {
+  setupSystem();
+  const value = normalizeText_(query);
+  if (!value) return null;
+
+  const ss = getSpreadsheet_();
+  const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS));
+  return teachers.find((row) => {
+    const active = String(row.active).toLowerCase() !== 'false';
+    return active && (String(row.teacherId) === value || normalizeText_(row.name) === value);
+  }) || null;
 }
 
-function getAvailableShifts_() {
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_SHIFTS);
-  return readObjects_(sheet)
-    .filter(row => isTruthy_(row.visible))
-    .map(row => {
-      const selectedCount = getSelectedCount_(row.shift_id);
-      const quota = Number(row.quota || 0);
-      return {
-        shift_id: row.shift_id,
-        date: row.date,
-        duty: row.duty,
-        time: row.time,
-        report_time: row.report_time,
-        place: row.place,
-        quota,
-        selected_count: selectedCount,
-        remaining: Math.max(quota - selectedCount, 0)
-      };
-    });
-}
-
-function getSelectedCount_(shiftId) {
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_SELECTIONS);
-  return readObjects_(sheet).filter(row => clean_(row.shift_id) === clean_(shiftId)).length;
-}
-
-function getTeacherById_(teacherId) {
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_TEACHERS);
-  return readObjects_(sheet).find(row => clean_(row.teacher_id) === clean_(teacherId));
-}
-
-function getShiftById_(shiftId) {
-  const ss = openSpreadsheet_();
-  const sheet = ss.getSheetByName(CONFIG.SHEET_SHIFTS);
-  return readObjects_(sheet).find(row => clean_(row.shift_id) === clean_(shiftId));
-}
-
-function scanRoster_(ss) {
-  const result = [];
-  ss.getSheets().forEach(sheet => {
-    const values = sheet.getDataRange().getDisplayValues();
-    for (let r = 0; r < values.length; r += 1) {
-      const row = values[r].map(cell => clean_(cell));
-      const idCol = row.findIndex(cell => cell === '學號' || cell === '代碼' || cell === '編號');
-      const nameCol = row.findIndex(cell => cell === '姓名');
-      if (idCol < 0 || nameCol < 0) continue;
-
-      let blankCount = 0;
-      for (let rr = r + 1; rr < values.length; rr += 1) {
-        const id = clean_(values[rr][idCol]);
-        const name = clean_(values[rr][nameCol]);
-
-        if (!id && !name) {
-          blankCount += 1;
-          if (blankCount >= 3) break;
-          continue;
-        }
-        blankCount = 0;
-
-        if (!id || !name) continue;
-        if (!/^\d+$/.test(id)) continue;
-        if (['休園', '無名額', '無人認養'].includes(name)) continue;
-
-        result.push({ teacher_id: id, display_name: name });
-      }
-    }
-  });
-
-  const seen = new Set();
-  return result.filter(person => {
-    if (seen.has(person.teacher_id)) return false;
-    seen.add(person.teacher_id);
-    return true;
-  });
+function getSpreadsheet_() {
+  if (CONFIG.SPREADSHEET_ID) return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  return SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function ensureSheet_(ss, sheetName, headers) {
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) sheet = ss.insertSheet(sheetName);
 
-  const currentHeaders = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0];
-  const needHeader = headers.some((header, index) => currentHeaders[index] !== header);
-  if (sheet.getLastRow() === 0 || needHeader) {
+  const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  const hasHeaders = headers.every((header, i) => String(firstRow[i] || '') === header);
+  if (!hasHeaders) {
     sheet.clear();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
   }
-
   return sheet;
 }
 
-function readObjects_(sheet) {
-  const values = sheet.getDataRange().getDisplayValues();
-  if (values.length < 2) return [];
+function formatSystemSheets_() {
+  const ss = getSpreadsheet_();
+  Object.values(CONFIG.SHEETS).forEach((sheetName) => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold').setBackground('#e5e7eb');
+    sheet.autoResizeColumns(1, lastCol);
+  });
+}
 
-  const headers = values[0].map(cell => clean_(cell));
-  return values.slice(1).map(row => {
+function tableToObjects_(sheet) {
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((item) => String(item).trim());
+  return values.slice(1).filter((row) => row.some((cell) => cell !== '')).map((row) => {
     const obj = {};
-    headers.forEach((header, index) => {
-      obj[header] = row[index];
+    headers.forEach((header, i) => {
+      const value = row[i];
+      obj[header] = value instanceof Date ? Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm:ss') : value;
     });
     return obj;
-  }).filter(row => Object.values(row).some(value => clean_(value)));
+  });
 }
 
-function openSpreadsheet_() {
-  return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+function headerIndex_(headers) {
+  const index = {};
+  headers.forEach((header, i) => {
+    index[String(header).trim()] = i;
+  });
+  return index;
 }
 
-function publicTeacher_(teacher) {
-  return {
-    teacher_id: teacher.teacher_id,
-    display_name: teacher.display_name
-  };
+function keyBy_(rows, key) {
+  return rows.reduce((acc, row) => {
+    acc[row[key]] = row;
+    return acc;
+  }, {});
 }
 
-function requireAdmin_(params) {
-  const token = clean_((params && params.token) || '');
-  if (!CONFIG.ADMIN_TOKEN || CONFIG.ADMIN_TOKEN === 'CHANGE_ME_ADMIN_TOKEN') {
-    throw new Error('請先在 Apps Script 裡修改 ADMIN_TOKEN。');
-  }
-  if (token !== CONFIG.ADMIN_TOKEN) {
-    throw new Error('管理員 token 錯誤。');
-  }
+function groupBy_(rows, key) {
+  return rows.reduce((acc, row) => {
+    const groupKey = row[key];
+    if (!acc[groupKey]) acc[groupKey] = [];
+    acc[groupKey].push(row);
+    return acc;
+  }, {});
 }
 
-function isTruthy_(value) {
-  const text = clean_(value).toLowerCase();
-  return ['true', 'yes', 'y', '1', '是', '開放'].includes(text);
-}
-
-function clean_(value) {
+function normalizeText_(value) {
   return String(value == null ? '' : value).trim();
 }
 
-function json_(payload) {
+function normalizeParams_(e) {
+  const params = Object.assign({}, e && e.parameter ? e.parameter : {});
+
+  if (e && e.postData && e.postData.contents) {
+    try {
+      Object.assign(params, JSON.parse(e.postData.contents));
+    } catch (error) {
+      // 表單或非 JSON POST 時略過。
+    }
+  }
+
+  return params;
+}
+
+function jsonResponse_(payload, callback) {
+  const json = JSON.stringify(payload);
+  if (callback) {
+    return ContentService
+      .createTextOutput(String(callback) + '(' + json + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
   return ContentService
-    .createTextOutput(JSON.stringify(payload))
+    .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
 }
