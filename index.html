@@ -3,23 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>志工／老師公開選班系統</title>
+  <title>後慈湖 8 月線上排班月曆</title>
   <link rel="stylesheet" href="style.css" />
   <script src="app.js" defer></script>
 </head>
 <body>
   <header class="hero">
-    <p class="eyebrow">Volunteer Shift System</p>
-    <h1>志工／老師公開選班系統</h1>
-    <p class="subtitle">公開看誰選了哪一班、哪裡還缺人、誰想換班；資料寫回 Google Sheets。</p>
+    <p class="eyebrow">Hou Cihu Online Shift Calendar</p>
+    <h1>後慈湖 8 月線上排班月曆</h1>
+    <p class="subtitle">老師直接看月曆選班；週二休園不排，其餘日期開放線上選班與換班申請。</p>
   </header>
 
   <main class="layout">
     <section class="panel notice">
-      <strong>已串接 Apps Script 後端</strong>
-      <p>這版不再用手機本機資料，選班、確認與換班申請會寫入 Google Sheets。若剛部署完看不到資料，請先按「建立後端工作表」與「匯入學號姓名」。</p>
+      <strong>8 月開始使用線上排班</strong>
+      <p>這版不是 Excel 大表，是線上月曆。大家可以看到每一天有哪些班、誰已經選、哪一班還缺人，也可以自己提出換班。</p>
       <div class="search-row admin-tools">
-        <button id="refreshBtn" type="button">重新整理公開班表</button>
+        <button id="refreshBtn" type="button">重新整理月曆</button>
         <button id="setupBackendBtn" type="button">建立後端工作表</button>
         <button id="importTeachersBtn" type="button">從原表匯入學號姓名</button>
       </div>
@@ -28,7 +28,7 @@
 
     <section class="panel">
       <h2>一、老師登入／查詢</h2>
-      <p class="hint">請輸入學號或姓名，例如 230 或 葉毓華。</p>
+      <p class="hint">請輸入學號或姓名，例如 230 或 葉毓華。查詢後就能在下方月曆選班。</p>
       <div class="search-row">
         <input id="queryInput" type="text" placeholder="請輸入學號或姓名" autocomplete="off" />
         <button id="searchBtn" type="button">查詢我的班表</button>
@@ -37,8 +37,8 @@
     </section>
 
     <section class="panel">
-      <h2>二、公開可選班別</h2>
-      <p class="hint">大家可以看到每一班已選人員與剩餘名額；先登入查詢後，就可以按「選這一班」。</p>
+      <h2>二、8 月線上排班月曆</h2>
+      <p class="hint">週二休園不用排老師；其他日期都列出可選班別。手機可左右滑動看完整月曆。</p>
       <div id="shiftList" class="cards"></div>
     </section>
 
@@ -46,7 +46,7 @@
       <div class="section-title-row">
         <div>
           <h2>三、公開檢查區</h2>
-          <p class="hint">顯示已選班、未確認與換班申請，方便大家自行協調換班。</p>
+          <p class="hint">顯示已選班、未確認與換班申請，方便大家自行協調。</p>
         </div>
       </div>
       <div id="adminPanel" class="admin-panel"></div>
@@ -54,7 +54,7 @@
   </main>
 
   <footer>
-    <p>公開版：GitHub Pages 顯示畫面；Google Sheets 儲存選班資料。</p>
+    <p>後慈湖線上排班：GitHub Pages 顯示月曆；Google Sheets 儲存選班資料。</p>
   </footer>
 </body>
 </html>
