@@ -1,20 +1,10 @@
 /**
- * 志工／老師選班系統 Apps Script 後端
- *
- * 使用方式：
- * 1. 打開目標 Google 試算表。
- * 2. 擴充功能 → Apps Script。
- * 3. 貼上本檔內容。
- * 4. 先執行 setupSystem()，授權後會建立 Teachers / Shifts / Selections / SwapRequests。
- * 5. 可再執行 importTeachersFromWorkbook()，自動從既有工作表找「學號、姓名」匯入 Teachers。
- * 6. 部署 → 新增部署作業 → 網頁應用程式。
- *    - 執行身分：我
- *    - 誰可以存取：任何人
- * 7. 複製 Web app URL，貼到前端 app.js 的 API_URL。
+ * 志工／老師公開選班系統 Apps Script 後端
+ * 試算表 ID 已改為 Google 試算表版：1A1gTUYUDlyR7kN47CQYksid37GeMxPOIh4il5ms-ZR4
  */
 
 const CONFIG = {
-  SPREADSHEET_ID: '1te6Eql2eBh7l4JgFb-fOuHmmH-mtWdpc',
+  SPREADSHEET_ID: '1A1gTUYUDlyR7kN47CQYksid37GeMxPOIh4il5ms-ZR4',
   SHEETS: {
     TEACHERS: 'Teachers',
     SHIFTS: 'Shifts',
@@ -45,7 +35,6 @@ function handleRequest_(e) {
 
   try {
     let data;
-
     switch (action) {
       case 'setup':
         data = setupSystem();
@@ -80,7 +69,6 @@ function handleRequest_(e) {
       default:
         throw new Error('Unknown action: ' + action);
     }
-
     return jsonResponse_({ ok: true, action, data }, callback);
   } catch (error) {
     return jsonResponse_({ ok: false, action, error: String(error.message || error) }, callback);
@@ -124,8 +112,7 @@ function importTeachersFromWorkbook() {
 
   const ss = getSpreadsheet_();
   const target = ss.getSheetByName(CONFIG.SHEETS.TEACHERS);
-  const existing = tableToObjects_(target);
-  const existingIds = new Set(existing.map((row) => String(row.teacherId)));
+  const existingIds = new Set(tableToObjects_(target).map((row) => String(row.teacherId)));
   const newRows = [];
 
   ss.getSheets().forEach((sheet) => {
@@ -136,17 +123,17 @@ function importTeachersFromWorkbook() {
       for (let c = 0; c < values[r].length - 1; c++) {
         const first = normalizeText_(values[r][c]);
         const second = normalizeText_(values[r][c + 1]);
-        if (first === '學號' && second === '姓名') {
-          for (let i = r + 1; i < values.length; i++) {
-            const id = normalizeText_(values[i][c]);
-            const name = normalizeText_(values[i][c + 1]);
-            if (!id && !name) break;
-            if (!id || !name) continue;
-            if (id === '休園' || name === '休園' || name === '無名額') continue;
-            if (existingIds.has(id)) continue;
-            existingIds.add(id);
-            newRows.push([id, name, true, '', '', '由 ' + sheet.getName() + ' 匯入']);
-          }
+        if (first !== '學號' || second !== '姓名') continue;
+
+        for (let i = r + 1; i < values.length; i++) {
+          const id = normalizeText_(values[i][c]);
+          const name = normalizeText_(values[i][c + 1]);
+          if (!id && !name) break;
+          if (!id || !name) continue;
+          if (id === '休園' || name === '休園' || name === '無名額' || id === '無人認養') continue;
+          if (existingIds.has(id)) continue;
+          existingIds.add(id);
+          newRows.push([id, name, true, '', '', '由 ' + sheet.getName() + ' 匯入']);
         }
       }
     }
@@ -187,13 +174,7 @@ function getPublicData() {
     };
   });
 
-  return {
-    teachers,
-    shifts: shiftsWithState,
-    selections,
-    swaps,
-    generatedAt: new Date().toISOString()
-  };
+  return { teachers, shifts: shiftsWithState, selections, swaps, generatedAt: new Date().toISOString() };
 }
 
 function lookupTeacher(query) {
@@ -208,10 +189,7 @@ function lookupTeacher(query) {
 
   return {
     teacher,
-    selections: selections.map((selection) => ({
-      ...selection,
-      shift: shiftById[selection.shiftId] || null
-    }))
+    selections: selections.map((selection) => ({ ...selection, shift: shiftById[selection.shiftId] || null }))
   };
 }
 
@@ -228,10 +206,9 @@ function selectShift(teacherKey, shiftId) {
     const teacher = findTeacher_(teacherKey);
     if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-    const shiftsSheet = ss.getSheetByName(CONFIG.SHEETS.SHIFTS);
     const selectionsSheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
-    const shifts = tableToObjects_(shiftsSheet);
-    const shift = shifts.find((row) => String(row.shiftId) === String(shiftId));
+    const shift = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS))
+      .find((row) => String(row.shiftId) === String(shiftId));
     if (!shift) throw new Error('查無此班別。');
     if (String(shift.status || 'open').toLowerCase() === 'closed') throw new Error('這個班別已關閉。');
 
@@ -245,24 +222,9 @@ function selectShift(teacherKey, shiftId) {
     if (selectedCount >= quota) throw new Error('這個班別已額滿。');
 
     const selectionId = 'SEL-' + Utilities.getUuid().slice(0, 8);
-    selectionsSheet.appendRow([
-      selectionId,
-      teacher.teacherId,
-      teacher.name,
-      shift.shiftId,
-      false,
-      new Date(),
-      '',
-      ''
-    ]);
+    selectionsSheet.appendRow([selectionId, teacher.teacherId, teacher.name, shift.shiftId, false, new Date(), '', '']);
 
-    return {
-      selectionId,
-      teacherId: teacher.teacherId,
-      teacherName: teacher.name,
-      shiftId: shift.shiftId,
-      message: '選班成功，請記得按「我知道了」。'
-    };
+    return { selectionId, teacherId: teacher.teacherId, teacherName: teacher.name, shiftId: shift.shiftId, message: '選班成功，請記得按「我知道了」。' };
   } finally {
     lock.releaseLock();
   }
@@ -282,7 +244,6 @@ function confirmShift(teacherKey, shiftId, selectionId) {
     const row = values[r];
     const matchedBySelectionId = selectionId && String(row[index.selectionId]) === String(selectionId);
     const matchedByTeacherAndShift = teacher && String(row[index.teacherId]) === String(teacher.teacherId) && String(row[index.shiftId]) === String(shiftId);
-
     if (matchedBySelectionId || matchedByTeacherAndShift) {
       sheet.getRange(r + 1, index.confirmed + 1).setValue(true);
       sheet.getRange(r + 1, index.confirmedAt + 1).setValue(new Date());
@@ -326,8 +287,7 @@ function findTeacher_(query) {
   const value = normalizeText_(query);
   if (!value) return null;
 
-  const ss = getSpreadsheet_();
-  const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS));
+  const teachers = tableToObjects_(getSpreadsheet_().getSheetByName(CONFIG.SHEETS.TEACHERS));
   return teachers.find((row) => {
     const active = String(row.active).toLowerCase() !== 'false';
     return active && (String(row.teacherId) === value || normalizeText_(row.name) === value);
@@ -335,8 +295,7 @@ function findTeacher_(query) {
 }
 
 function getSpreadsheet_() {
-  if (CONFIG.SPREADSHEET_ID) return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  return SpreadsheetApp.getActiveSpreadsheet();
+  return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
 }
 
 function ensureSheet_(ss, sheetName, headers) {
@@ -408,15 +367,11 @@ function normalizeText_(value) {
 
 function normalizeParams_(e) {
   const params = Object.assign({}, e && e.parameter ? e.parameter : {});
-
   if (e && e.postData && e.postData.contents) {
     try {
       Object.assign(params, JSON.parse(e.postData.contents));
-    } catch (error) {
-      // 表單或非 JSON POST 時略過。
-    }
+    } catch (error) {}
   }
-
   return params;
 }
 
@@ -427,7 +382,6 @@ function jsonResponse_(payload, callback) {
       .createTextOutput(String(callback) + '(' + json + ');')
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
-
   return ContentService
     .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
