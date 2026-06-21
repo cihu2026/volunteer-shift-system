@@ -67,7 +67,7 @@ async function loadPublicData() {
   renderMessage('#adminPanel', '載入公開檢查資料中...');
   try {
     const data = await apiGet({ action: 'getPublicData' });
-    state.publicData = data;
+    state.publicData = normalizePublicData(data);
     renderShiftCalendar();
     renderAdminPanel();
     showApiStatus('後端連線正常，已載入 8 月線上排班。資料時間：' + formatDateTime(data.generatedAt), 'success-text');
@@ -76,6 +76,24 @@ async function loadPublicData() {
     renderMessage('#shiftList', error.message);
     renderMessage('#adminPanel', '請先確認 Apps Script 已部署，且存取權是「任何人」。');
   }
+}
+
+function normalizePublicData(data) {
+  const normalized = { ...data };
+  normalized.shifts = (data.shifts || []).map((shift) => ({
+    ...shift,
+    date: normalizeDateKey(shift.date)
+  })).filter((shift) => Boolean(shift.date));
+  normalized.selections = data.selections || [];
+  normalized.swaps = data.swaps || [];
+  return normalized;
+}
+
+function normalizeDateKey(value) {
+  const text = String(value || '').trim();
+  const matched = text.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (!matched) return '';
+  return `${matched[1]}/${String(Number(matched[2])).padStart(2, '0')}/${String(Number(matched[3])).padStart(2, '0')}`;
 }
 
 function useTypedTeacherKey() {
@@ -100,6 +118,12 @@ async function queryMySchedule() {
 
   try {
     const data = await apiGet({ action: 'lookupTeacher', teacherKey: key });
+    if (data && data.selections) {
+      data.selections = data.selections.map((selection) => ({
+        ...selection,
+        shift: selection.shift ? { ...selection.shift, date: normalizeDateKey(selection.shift.date) } : selection.shift
+      }));
+    }
     state.teacherResult = data;
     renderMySchedule();
     await loadPublicData();
@@ -253,7 +277,7 @@ function renderShiftCalendar() {
     const isTuesday = weekday === '二';
     const shiftHtml = dayShifts.length
       ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds)).join('')
-      : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開班'}</div>`;
+      : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開放'}</div>`;
 
     cells.push(`
       <div class="calendar-day ${isTuesday ? 'rest-day' : ''}">
