@@ -76,6 +76,16 @@ body {
   color: var(--muted);
 }
 
+.success-text {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.danger-text {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .notice {
   border-color: #fbbf24;
   background: var(--warn-bg);
@@ -86,6 +96,10 @@ body {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+}
+
+.admin-tools {
+  margin-top: 10px;
 }
 
 input,
@@ -166,12 +180,17 @@ button.danger { background: var(--danger); }
   background: #f8fafc;
 }
 
-.admin-panel { overflow-x: auto; }
+.admin-panel {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
 .admin-panel table {
   width: 100%;
   border-collapse: collapse;
   min-width: 680px;
 }
+
 .admin-panel th,
 .admin-panel td {
   border-bottom: 1px solid var(--line);
@@ -179,6 +198,7 @@ button.danger { background: var(--danger); }
   padding: 10px;
   vertical-align: top;
 }
+
 .admin-panel th {
   background: #f8fafc;
   font-weight: 800;
