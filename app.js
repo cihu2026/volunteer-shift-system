@@ -17,7 +17,6 @@ function apiGet(params) {
   return new Promise((resolve, reject) => {
     const callbackName = 'volunteerShiftCallback_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const url = new URL(API_URL);
-
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
     });
@@ -66,7 +65,6 @@ async function loadPublicData() {
   showApiStatus('正在載入 8 月線上排班月曆...', 'hint');
   renderMessage('#shiftList', '載入月曆中...');
   renderMessage('#adminPanel', '載入公開檢查資料中...');
-
   try {
     const data = await apiGet({ action: 'getPublicData' });
     state.publicData = data;
@@ -80,16 +78,24 @@ async function loadPublicData() {
   }
 }
 
+function useTypedTeacherKey() {
+  const input = document.querySelector('#queryInput');
+  state.teacherKey = input ? input.value.trim() : '';
+  if (state.publicData) renderShiftCalendar();
+}
+
 async function queryMySchedule() {
   const input = document.querySelector('#queryInput');
   const key = input.value.trim();
-
   if (!key) {
+    state.teacherKey = '';
     renderMessage('#mySchedule', '請先輸入學號或姓名。');
+    renderShiftCalendar();
     return;
   }
 
   state.teacherKey = key;
+  renderShiftCalendar();
   renderMessage('#mySchedule', '查詢中...');
 
   try {
@@ -99,7 +105,8 @@ async function queryMySchedule() {
     await loadPublicData();
   } catch (error) {
     state.teacherResult = null;
-    renderMessage('#mySchedule', error.message);
+    renderMessage('#mySchedule', error.message + '（可以先確認是否已按「從原表匯入學號姓名」。）');
+    renderShiftCalendar();
   }
 }
 
@@ -126,7 +133,6 @@ async function confirmSelection(selectionId, shiftId) {
     alert('請先輸入學號或姓名。');
     return;
   }
-
   try {
     const result = await apiGet({ action: 'confirmShift', teacherKey: key, selectionId, shiftId });
     alert(result.message || '已確認。');
@@ -142,10 +148,8 @@ async function requestSwap(originalShiftId) {
     alert('請先輸入學號或姓名。');
     return;
   }
-
   const desiredShiftId = prompt('想換到哪一班？可填班別代碼，例如 AUG031；不確定可留空。', '') || '';
   const note = prompt('換班備註，例如：想找人互換、那天臨時有事。', '') || '';
-
   try {
     const result = await apiGet({ action: 'requestSwap', teacherKey: key, originalShiftId, desiredShiftId, note });
     alert(result.message || '已建立換班申請。');
@@ -180,7 +184,6 @@ async function importTeachers() {
 function renderMySchedule() {
   const target = document.querySelector('#mySchedule');
   const data = state.teacherResult;
-
   if (!data || !data.teacher) {
     renderMessage('#mySchedule', '請輸入學號或姓名查詢。');
     return;
@@ -188,7 +191,6 @@ function renderMySchedule() {
 
   const teacher = data.teacher;
   const selections = data.selections || [];
-
   if (selections.length === 0) {
     target.innerHTML = `<div class="empty">${escapeHtml(teacher.name)} 目前尚未選班。請往下看 8 月月曆選班。</div>`;
     return;
@@ -219,7 +221,6 @@ function renderMySchedule() {
 function renderShiftCalendar() {
   const target = document.querySelector('#shiftList');
   const data = state.publicData;
-
   if (!data || !Array.isArray(data.shifts)) {
     renderMessage('#shiftList', '尚未載入公開班表。');
     return;
@@ -230,7 +231,6 @@ function renderShiftCalendar() {
     if (dateCompare !== 0) return dateCompare;
     return String(a.startTime).localeCompare(String(b.startTime));
   });
-
   if (shifts.length === 0) {
     target.innerHTML = '<div class="empty">目前沒有可選班別。</div>';
     return;
@@ -243,8 +243,7 @@ function renderShiftCalendar() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDay = new Date(year, month - 1, 1).getDay();
   const cells = [];
-
-  for (let i = 0; i < firstDay; i += 1) cells.push(`<div class="calendar-day empty-day"></div>`);
+  for (let i = 0; i < firstDay; i += 1) cells.push('<div class="calendar-day empty-day"></div>');
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateKey = `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
@@ -252,27 +251,27 @@ function renderShiftCalendar() {
     const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
     const dayShifts = shiftsByDate[dateKey] || [];
     const isTuesday = weekday === '二';
-
     const shiftHtml = dayShifts.length
       ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds)).join('')
       : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開班'}</div>`;
 
     cells.push(`
       <div class="calendar-day ${isTuesday ? 'rest-day' : ''}">
-        <div class="day-number">
-          <strong>${day}</strong>
-          <span>${weekday}</span>
-        </div>
+        <div class="day-number"><strong>${day}</strong><span>${weekday}</span></div>
         <div class="shift-stack">${shiftHtml}</div>
       </div>
     `);
   }
 
+  const loginHint = state.teacherKey
+    ? `目前以「${escapeHtml(state.teacherKey)}」選班。看到想要的班，直接按「選」。`
+    : '先在上方輸入學號或姓名；輸入後月曆裡會出現「選」按鈕。';
+
   target.innerHTML = `
     <div class="month-toolbar">
       <div>
         <h3>${escapeHtml(monthLabel)} 線上排班月曆</h3>
-        <p class="hint">週二休園不排老師；其他日期都開放選班。先輸入學號或姓名查詢，再點月曆裡的「選」。</p>
+        <p class="hint">週二休園不排老師；其他日期都開放選班。${loginHint}</p>
       </div>
       <span class="badge ok">共 ${shifts.length} 個可選班別</span>
     </div>
@@ -288,9 +287,10 @@ function renderShiftCalendar() {
 function renderShiftInCalendar(shift, selectedShiftIds) {
   const full = Number(shift.remaining) <= 0;
   const alreadySelected = selectedShiftIds.has(shift.shiftId);
-  const disabled = full || alreadySelected || !state.teacherKey;
+  const hasKey = Boolean(state.teacherKey);
+  const disabled = full || alreadySelected || !hasKey;
   const people = (shift.selectedPeople || []).map((person) => `${escapeHtml(person.teacherName)}${isTrue(person.confirmed) ? '✅' : '⚠️'}`).join('、') || '尚無人';
-  const statusText = alreadySelected ? '已選' : full ? '滿' : state.teacherKey ? '選' : '先查';
+  const statusText = alreadySelected ? '已選' : full ? '滿' : hasKey ? '選' : '輸入後選';
 
   return `
     <div class="shift-pill ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''}">
@@ -311,7 +311,6 @@ function renderShiftInCalendar(shift, selectedShiftIds) {
 function renderAdminPanel() {
   const panel = document.querySelector('#adminPanel');
   const data = state.publicData;
-
   if (!data) {
     renderMessage('#adminPanel', '尚未載入公開資料。');
     return;
@@ -320,7 +319,6 @@ function renderAdminPanel() {
   const shiftsById = new Map((data.shifts || []).map((shift) => [String(shift.shiftId), shift]));
   const selections = data.selections || [];
   const swaps = data.swaps || [];
-
   const selectionRows = selections.length
     ? selections.map((item) => {
         const shift = shiftsById.get(String(item.shiftId)) || {};
@@ -336,7 +334,6 @@ function renderAdminPanel() {
         `;
       }).join('')
     : '<tr><td colspan="4">目前沒有任何選班紀錄。</td></tr>';
-
   const swapRows = swaps.length
     ? swaps.map((item) => `
         <tr>
@@ -350,15 +347,9 @@ function renderAdminPanel() {
 
   panel.innerHTML = `
     <h3>選班與確認狀態</h3>
-    <table>
-      <thead><tr><th>人員</th><th>班別</th><th>時間</th><th>確認</th></tr></thead>
-      <tbody>${selectionRows}</tbody>
-    </table>
+    <table><thead><tr><th>人員</th><th>班別</th><th>時間</th><th>確認</th></tr></thead><tbody>${selectionRows}</tbody></table>
     <h3>換班申請</h3>
-    <table>
-      <thead><tr><th>人員</th><th>原班別</th><th>想換到</th><th>備註／狀態</th></tr></thead>
-      <tbody>${swapRows}</tbody>
-    </table>
+    <table><thead><tr><th>人員</th><th>原班別</th><th>想換到</th><th>備註／狀態</th></tr></thead><tbody>${swapRows}</tbody></table>
   `;
 }
 
@@ -385,13 +376,7 @@ function formatDateTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
+  return new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
 function isTrue(value) {
@@ -421,6 +406,7 @@ function init() {
 
 document.querySelector('#refreshBtn').addEventListener('click', loadPublicData);
 document.querySelector('#searchBtn').addEventListener('click', queryMySchedule);
+document.querySelector('#queryInput').addEventListener('input', useTypedTeacherKey);
 document.querySelector('#queryInput').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') queryMySchedule();
 });
