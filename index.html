@@ -3,70 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>志工／老師選班安全版</title>
+  <title>志工／老師公開選班系統</title>
   <link rel="stylesheet" href="style.css" />
   <script src="app.js" defer></script>
 </head>
 <body>
   <header class="hero">
     <p class="eyebrow">Volunteer Shift System</p>
-    <h1>志工／老師選班安全版</h1>
-    <p class="subtitle">真實名單與班表留在 Google Sheets；GitHub Pages 只放前端，不公開志工姓名清單。</p>
+    <h1>志工／老師公開選班系統</h1>
+    <p class="subtitle">公開看誰選了哪一班、哪裡還缺人、誰想換班；資料寫回 Google Sheets。</p>
   </header>
 
   <main class="layout">
     <section class="panel notice">
-      <strong>安全版重點</strong>
-      <p>老師只輸入自己的個人代碼查詢與選班；真實資料由 Google Apps Script 從 Google Sheets 讀取，不寫進公開 GitHub。</p>
-    </section>
-
-    <section class="panel">
-      <h2>零、連接 Google Sheets 後端</h2>
-      <p class="hint">把 Apps Script 部署後取得的 Web App URL 貼在這裡。這個網址只存在本機瀏覽器，不會寫進 GitHub。</p>
-      <div class="search-row">
-        <input id="apiUrlInput" type="url" placeholder="貼上 Apps Script Web App URL" autocomplete="off" />
-        <button id="saveApiUrlBtn" type="button">儲存後端網址</button>
+      <strong>已串接 Apps Script 後端</strong>
+      <p>這版不再用手機本機資料，選班、確認與換班申請會寫入 Google Sheets。若剛部署完看不到資料，請先按「建立後端工作表」與「匯入學號姓名」。</p>
+      <div class="search-row admin-tools">
+        <button id="refreshBtn" type="button">重新整理公開班表</button>
+        <button id="setupBackendBtn" type="button">建立後端工作表</button>
+        <button id="importTeachersBtn" type="button">從原表匯入學號姓名</button>
       </div>
       <p id="apiStatus" class="hint"></p>
     </section>
 
     <section class="panel">
       <h2>一、老師登入／查詢</h2>
-      <p class="hint">請輸入個人代碼，例如志工學號。安全版不建議用姓名查詢，避免別人猜名字看到班表。</p>
+      <p class="hint">請輸入學號或姓名，例如 230 或 葉毓華。</p>
       <div class="search-row">
-        <input id="queryInput" type="text" placeholder="請輸入個人代碼" autocomplete="off" />
+        <input id="queryInput" type="text" placeholder="請輸入學號或姓名" autocomplete="off" />
         <button id="searchBtn" type="button">查詢我的班表</button>
       </div>
       <div id="mySchedule" class="cards"></div>
     </section>
 
     <section class="panel">
-      <h2>二、可選班別</h2>
-      <p class="hint">查詢成功後才會顯示可選班別。選班時會由 Google Sheets 後端檢查名額，避免額滿後還被重複選走。</p>
+      <h2>二、公開可選班別</h2>
+      <p class="hint">大家可以看到每一班已選人員與剩餘名額；先登入查詢後，就可以按「選這一班」。</p>
       <div id="shiftList" class="cards"></div>
     </section>
 
     <section class="panel">
       <div class="section-title-row">
         <div>
-          <h2>三、管理員檢查區</h2>
-          <p class="hint">輸入 Apps Script 裡設定的 ADMIN_TOKEN，才可以查看全部選班與未確認名單。</p>
+          <h2>三、公開檢查區</h2>
+          <p class="hint">顯示已選班、未確認與換班申請，方便大家自行協調換班。</p>
         </div>
-      </div>
-      <div class="search-row admin-tools">
-        <input id="adminTokenInput" type="password" placeholder="管理員 token" autocomplete="off" />
-        <button id="adminBtn" type="button">查看管理員名單</button>
-      </div>
-      <div class="search-row admin-tools">
-        <button id="setupBackendBtn" type="button">建立後端工作表</button>
-        <button id="importTeachersBtn" type="button">從原表匯入學號姓名</button>
       </div>
       <div id="adminPanel" class="admin-panel"></div>
     </section>
   </main>
 
   <footer>
-    <p>安全版：公開 GitHub 只放程式；真實資料保留在 Google Sheets。</p>
+    <p>公開版：GitHub Pages 顯示畫面；Google Sheets 儲存選班資料。</p>
   </footer>
 </body>
 </html>
