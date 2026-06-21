@@ -3,28 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>志工／老師選班系統</title>
+  <title>志工／老師選班安全版</title>
   <link rel="stylesheet" href="style.css" />
   <script src="app.js" defer></script>
 </head>
 <body>
   <header class="hero">
     <p class="eyebrow">Volunteer Shift System</p>
-    <h1>志工／老師選班系統</h1>
-    <p class="subtitle">讓每位老師查自己的班、選班、確認「我知道了」，不要再從 200 人大表裡找自己。</p>
+    <h1>志工／老師選班安全版</h1>
+    <p class="subtitle">真實名單與班表留在 Google Sheets；GitHub Pages 只放前端，不公開志工姓名清單。</p>
   </header>
 
   <main class="layout">
     <section class="panel notice">
-      <strong>目前是第一版示範系統。</strong>
-      <p>這版先用瀏覽器本機資料示範流程：查詢、選班、確認、管理員檢查。正式上線前要再接 Google Sheets 或 Firebase，資料才會同步給管理員。</p>
+      <strong>安全版重點</strong>
+      <p>老師只輸入自己的個人代碼查詢與選班；真實資料由 Google Apps Script 從 Google Sheets 讀取，不寫進公開 GitHub。</p>
+    </section>
+
+    <section class="panel">
+      <h2>零、連接 Google Sheets 後端</h2>
+      <p class="hint">把 Apps Script 部署後取得的 Web App URL 貼在這裡。這個網址只存在本機瀏覽器，不會寫進 GitHub。</p>
+      <div class="search-row">
+        <input id="apiUrlInput" type="url" placeholder="貼上 Apps Script Web App URL" autocomplete="off" />
+        <button id="saveApiUrlBtn" type="button">儲存後端網址</button>
+      </div>
+      <p id="apiStatus" class="hint"></p>
     </section>
 
     <section class="panel">
       <h2>一、老師登入／查詢</h2>
-      <p class="hint">測試代碼：T001、T002、T003，或輸入王老師、陳老師、林老師。</p>
+      <p class="hint">請輸入個人代碼，例如志工學號。安全版不建議用姓名查詢，避免別人猜名字看到班表。</p>
       <div class="search-row">
-        <input id="queryInput" type="text" placeholder="請輸入姓名或代碼" autocomplete="off" />
+        <input id="queryInput" type="text" placeholder="請輸入個人代碼" autocomplete="off" />
         <button id="searchBtn" type="button">查詢我的班表</button>
       </div>
       <div id="mySchedule" class="cards"></div>
@@ -32,7 +42,7 @@
 
     <section class="panel">
       <h2>二、可選班別</h2>
-      <p class="hint">先輸入姓名或代碼，才可以選班。示範版會檢查名額，額滿就不能再選。</p>
+      <p class="hint">查詢成功後才會顯示可選班別。選班時會由 Google Sheets 後端檢查名額，避免額滿後還被重複選走。</p>
       <div id="shiftList" class="cards"></div>
     </section>
 
@@ -40,16 +50,23 @@
       <div class="section-title-row">
         <div>
           <h2>三、管理員檢查區</h2>
-          <p class="hint">看誰已選班、誰還沒按「我知道了」。</p>
+          <p class="hint">輸入 Apps Script 裡設定的 ADMIN_TOKEN，才可以查看全部選班與未確認名單。</p>
         </div>
-        <button id="resetBtn" class="danger" type="button">重置示範資料</button>
+      </div>
+      <div class="search-row admin-tools">
+        <input id="adminTokenInput" type="password" placeholder="管理員 token" autocomplete="off" />
+        <button id="adminBtn" type="button">查看管理員名單</button>
+      </div>
+      <div class="search-row admin-tools">
+        <button id="setupBackendBtn" type="button">建立後端工作表</button>
+        <button id="importTeachersBtn" type="button">從原表匯入學號姓名</button>
       </div>
       <div id="adminPanel" class="admin-panel"></div>
     </section>
   </main>
 
   <footer>
-    <p>第一版：純前端示範。下一版可接 Google Sheets + Apps Script，自動寄信提醒。</p>
+    <p>安全版：公開 GitHub 只放程式；真實資料保留在 Google Sheets。</p>
   </footer>
 </body>
 </html>
