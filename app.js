@@ -3,8 +3,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxQj4g1Ee-3TGL7iikQ49cQ
 const state = {
   publicData: null,
   teacherKey: '',
-  teacherResult: null,
-  loading: false
+  teacherResult: null
 };
 
 function showApiStatus(message, type = 'hint') {
@@ -20,9 +19,7 @@ function apiGet(params) {
     const url = new URL(API_URL);
 
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        url.searchParams.set(key, value);
-      }
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
     });
     url.searchParams.set('callback', callbackName);
     url.searchParams.set('_', Date.now());
@@ -66,16 +63,16 @@ function apiGet(params) {
 }
 
 async function loadPublicData() {
-  showApiStatus('正在載入 Google Sheets 公開班表...', 'hint');
-  renderMessage('#shiftList', '載入公開班表中...');
+  showApiStatus('正在載入 8 月線上排班月曆...', 'hint');
+  renderMessage('#shiftList', '載入月曆中...');
   renderMessage('#adminPanel', '載入公開檢查資料中...');
 
   try {
     const data = await apiGet({ action: 'getPublicData' });
     state.publicData = data;
-    renderShiftList();
+    renderShiftCalendar();
     renderAdminPanel();
-    showApiStatus('後端連線正常，資料時間：' + formatDateTime(data.generatedAt), 'success-text');
+    showApiStatus('後端連線正常，已載入 8 月線上排班。資料時間：' + formatDateTime(data.generatedAt), 'success-text');
   } catch (error) {
     showApiStatus('連線失敗：' + error.message, 'danger-text');
     renderMessage('#shiftList', error.message);
@@ -146,17 +143,11 @@ async function requestSwap(originalShiftId) {
     return;
   }
 
-  const desiredShiftId = prompt('想換到哪一班？可填 shiftId，例如 S003；不確定可留空。', '') || '';
+  const desiredShiftId = prompt('想換到哪一班？可填班別代碼，例如 AUG031；不確定可留空。', '') || '';
   const note = prompt('換班備註，例如：想找人互換、那天臨時有事。', '') || '';
 
   try {
-    const result = await apiGet({
-      action: 'requestSwap',
-      teacherKey: key,
-      originalShiftId,
-      desiredShiftId,
-      note
-    });
+    const result = await apiGet({ action: 'requestSwap', teacherKey: key, originalShiftId, desiredShiftId, note });
     alert(result.message || '已建立換班申請。');
     await loadPublicData();
   } catch (error) {
@@ -199,7 +190,7 @@ function renderMySchedule() {
   const selections = data.selections || [];
 
   if (selections.length === 0) {
-    target.innerHTML = `<div class="empty">${escapeHtml(teacher.name)} 目前尚未選班。</div>`;
+    target.innerHTML = `<div class="empty">${escapeHtml(teacher.name)} 目前尚未選班。請往下看 8 月月曆選班。</div>`;
     return;
   }
 
@@ -225,7 +216,7 @@ function renderMySchedule() {
   }).join('');
 }
 
-function renderShiftList() {
+function renderShiftCalendar() {
   const target = document.querySelector('#shiftList');
   const data = state.publicData;
 
@@ -234,41 +225,87 @@ function renderShiftList() {
     return;
   }
 
-  const selectedShiftIds = new Set(
-    ((state.teacherResult && state.teacherResult.selections) || []).map((item) => item.shiftId)
-  );
+  const shifts = data.shifts.slice().sort((a, b) => {
+    const dateCompare = String(a.date).localeCompare(String(b.date));
+    if (dateCompare !== 0) return dateCompare;
+    return String(a.startTime).localeCompare(String(b.startTime));
+  });
 
-  if (data.shifts.length === 0) {
+  if (shifts.length === 0) {
     target.innerHTML = '<div class="empty">目前沒有可選班別。</div>';
     return;
   }
 
-  target.innerHTML = data.shifts.map((shift) => {
-    const full = Number(shift.remaining) <= 0;
-    const alreadySelected = selectedShiftIds.has(shift.shiftId);
-    const disabled = full || alreadySelected || !state.teacherKey;
-    const badgeClass = full ? 'danger' : 'ok';
-    const badgeText = full ? '已額滿' : `剩 ${shift.remaining} 名`;
-    const buttonText = alreadySelected ? '你已選此班' : full ? '已額滿' : state.teacherKey ? '選這一班' : '先查詢再選班';
-    const people = (shift.selectedPeople || []).length
-      ? shift.selectedPeople.map((person) => `${escapeHtml(person.teacherName)}${isTrue(person.confirmed) ? '✅' : '⚠️'}`).join('、')
-      : '尚無人選班';
+  const selectedShiftIds = new Set(((state.teacherResult && state.teacherResult.selections) || []).map((item) => item.shiftId));
+  const shiftsByDate = groupBy(shifts, 'date');
+  const monthLabel = getMonthLabel(shifts[0].date);
+  const [year, month] = shifts[0].date.split('/').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const cells = [];
 
-    return `
-      <article class="card">
-        <div class="card-title-row">
-          <h3>${escapeHtml(shift.date)}｜${escapeHtml(shift.site)} ${escapeHtml(shift.duty)}</h3>
-          <span class="badge ${badgeClass}">${badgeText}</span>
+  for (let i = 0; i < firstDay; i += 1) cells.push(`<div class="calendar-day empty-day"></div>`);
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+    const date = new Date(year, month - 1, day);
+    const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+    const dayShifts = shiftsByDate[dateKey] || [];
+    const isTuesday = weekday === '二';
+
+    const shiftHtml = dayShifts.length
+      ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds)).join('')
+      : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開班'}</div>`;
+
+    cells.push(`
+      <div class="calendar-day ${isTuesday ? 'rest-day' : ''}">
+        <div class="day-number">
+          <strong>${day}</strong>
+          <span>${weekday}</span>
         </div>
-        <p><strong>班別代碼：</strong>${escapeHtml(shift.shiftId)}</p>
-        <p><strong>服務時間：</strong>${escapeHtml(shift.startTime)}－${escapeHtml(shift.endTime)}</p>
-        <p><strong>報到時間：</strong>${escapeHtml(shift.reportTime)}</p>
-        <p><strong>名額：</strong>${escapeHtml(shift.selectedCount)} / ${escapeHtml(shift.quota)}</p>
-        <p><strong>已選人員：</strong>${people}</p>
-        <button type="button" ${disabled ? 'disabled' : ''} onclick="selectShift('${escapeAttr(shift.shiftId)}')">${buttonText}</button>
-      </article>
-    `;
-  }).join('');
+        <div class="shift-stack">${shiftHtml}</div>
+      </div>
+    `);
+  }
+
+  target.innerHTML = `
+    <div class="month-toolbar">
+      <div>
+        <h3>${escapeHtml(monthLabel)} 線上排班月曆</h3>
+        <p class="hint">週二休園不排老師；其他日期都開放選班。先輸入學號或姓名查詢，再點月曆裡的「選」。</p>
+      </div>
+      <span class="badge ok">共 ${shifts.length} 個可選班別</span>
+    </div>
+    <div class="calendar-wrap">
+      <div class="calendar-grid calendar-head">
+        ${['日', '一', '二', '三', '四', '五', '六'].map((w) => `<div>${w}</div>`).join('')}
+      </div>
+      <div class="calendar-grid">${cells.join('')}</div>
+    </div>
+  `;
+}
+
+function renderShiftInCalendar(shift, selectedShiftIds) {
+  const full = Number(shift.remaining) <= 0;
+  const alreadySelected = selectedShiftIds.has(shift.shiftId);
+  const disabled = full || alreadySelected || !state.teacherKey;
+  const people = (shift.selectedPeople || []).map((person) => `${escapeHtml(person.teacherName)}${isTrue(person.confirmed) ? '✅' : '⚠️'}`).join('、') || '尚無人';
+  const statusText = alreadySelected ? '已選' : full ? '滿' : state.teacherKey ? '選' : '先查';
+
+  return `
+    <div class="shift-pill ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''}">
+      <div class="shift-pill-main">
+        <span class="shift-code">${escapeHtml(shift.shiftId)}</span>
+        <strong>${escapeHtml(shift.duty)}</strong>
+      </div>
+      <div class="shift-time">${escapeHtml(shift.startTime)}－${escapeHtml(shift.endTime)}｜${escapeHtml(shift.site)}</div>
+      <div class="shift-people">${people}</div>
+      <div class="shift-action-row">
+        <span class="mini-badge">${escapeHtml(shift.selectedCount)} / ${escapeHtml(shift.quota)}</span>
+        <button class="mini-button" type="button" ${disabled ? 'disabled' : ''} onclick="selectShift('${escapeAttr(shift.shiftId)}')">${statusText}</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderAdminPanel() {
@@ -325,6 +362,20 @@ function renderAdminPanel() {
   `;
 }
 
+function groupBy(rows, key) {
+  return rows.reduce((acc, row) => {
+    const groupKey = row[key];
+    if (!acc[groupKey]) acc[groupKey] = [];
+    acc[groupKey].push(row);
+    return acc;
+  }, {});
+}
+
+function getMonthLabel(dateString) {
+  const [year, month] = String(dateString).split('/');
+  return `${year} 年 ${Number(month)} 月`;
+}
+
 function renderMessage(selector, message) {
   const el = document.querySelector(selector);
   if (el) el.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
@@ -363,7 +414,7 @@ function escapeAttr(value) {
 function init() {
   showApiStatus('後端網址已寫入前端，正在連線...', 'hint');
   renderMessage('#mySchedule', '請輸入學號或姓名查詢。');
-  renderMessage('#shiftList', '載入公開班表中...');
+  renderMessage('#shiftList', '載入 8 月月曆中...');
   renderMessage('#adminPanel', '載入公開檢查資料中...');
   loadPublicData();
 }
