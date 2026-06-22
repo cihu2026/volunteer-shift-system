@@ -316,7 +316,7 @@ function renderShiftCalendar() {
   const monthLabel = getMonthLabel(shifts[0].date);
   const [year, month] = shifts[0].date.split('/').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const firstDay = new Date(year, month - 1, 1).getDay();
+  const firstDay = (new Date(year, month - 1, 1).getDay() + 6) % 7;
   const cells = [];
   for (let i = 0; i < firstDay; i += 1) cells.push('<div class="calendar-day empty-day"></div>');
 
@@ -352,7 +352,7 @@ function renderShiftCalendar() {
     </div>
     <div class="calendar-wrap">
       <div class="calendar-grid calendar-head">
-        ${['日', '一', '二', '三', '四', '五', '六'].map((w) => `<div>${w}</div>`).join('')}
+        ${['一', '二', '三', '四', '五', '六', '日'].map((w) => `<div>${w}</div>`).join('')}
       </div>
       <div class="calendar-grid">${cells.join('')}</div>
     </div>
