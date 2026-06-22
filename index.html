@@ -7,8 +7,8 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>後慈湖 8 月線上排班月曆</title>
-  <link rel="stylesheet" href="style.css?v=17" />
-  <script src="app.js?v=17" defer></script>
+  <link rel="stylesheet" href="style.css?v=20" />
+  <script src="app.js?v=20" defer></script>
 </head>
 <body>
   <header class="hero">
@@ -41,7 +41,7 @@
 
     <section class="panel">
       <h2>二、8 月線上排班月曆</h2>
-      <p class="hint">週二休園不用排老師；其他日期都列出可選班別。手機可左右滑動看完整月曆。</p>
+      <p class="hint">週二休園不用排老師；其他日期都列出可選班別。A點班會用橘色特別標示，手機可左右滑動看完整月曆。</p>
       <div id="shiftList" class="cards"></div>
     </section>
 
@@ -59,5 +59,20 @@
   <footer>
     <p>後慈湖線上排班：GitHub Pages 顯示月曆；Google Sheets 儲存選班資料。</p>
   </footer>
+
+  <script>
+    (function markAPointShifts() {
+      function apply() {
+        document.querySelectorAll('.shift-pill').forEach(function (card) {
+          if (card.textContent.indexOf('A點') !== -1) card.classList.add('a-point');
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        apply();
+        new MutationObserver(apply).observe(document.body, { childList: true, subtree: true });
+      });
+    })();
+  </script>
 </body>
 </html>
