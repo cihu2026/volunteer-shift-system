@@ -17,6 +17,80 @@ button.day-number {
   white-space: nowrap;
 }
 
+.calendar-day.day-filled .day-number {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.calendar-day.day-filled .day-number em {
+  background: #16a34a;
+  color: #fff;
+}
+
+.calendar-day.day-missing-low .day-number {
+  background: #fef9c3;
+  border-color: #fde047;
+}
+
+.calendar-day.day-missing-low .day-number em {
+  background: #ca8a04;
+  color: #fff;
+}
+
+.calendar-day.day-missing-medium .day-number {
+  background: #fed7aa;
+  border-color: #fb923c;
+}
+
+.calendar-day.day-missing-medium .day-number em {
+  background: #ea580c;
+  color: #fff;
+}
+
+.calendar-day.day-missing-high .day-number {
+  background: #fecaca;
+  border-color: #ef4444;
+}
+
+.calendar-day.day-missing-high .day-number em {
+  background: #dc2626;
+  color: #fff;
+}
+
+.shift-pill.shift-filled {
+  background: #f0fdf4 !important;
+  border-color: #86efac !important;
+  border-left-color: #16a34a !important;
+}
+
+.shift-pill.shift-missing-low {
+  background: #fefce8 !important;
+  border-color: #fde047 !important;
+  border-left-color: #ca8a04 !important;
+}
+
+.shift-pill.shift-missing-medium {
+  background: #ffedd5 !important;
+  border-color: #fb923c !important;
+  border-left-color: #ea580c !important;
+}
+
+.shift-pill.shift-missing-high {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  border-left-color: #dc2626 !important;
+}
+
+.shift-pill.a-point.shift-missing-high,
+.shift-pill.a-point.shift-missing-medium,
+.shift-pill.a-point.shift-missing-low {
+  border-left-color: #c2410c !important;
+}
+
+.shift-pill.released {
+  outline: 2px solid #facc15 !important;
+}
+
 @media (min-width: 721px) {
   .calendar-day .shift-stack {
     display: grid !important;
