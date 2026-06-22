@@ -427,30 +427,30 @@ footer {
 
 @media (max-width: 720px) {
   body {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .hero {
-    padding: 22px 14px;
+    padding: 18px 12px;
   }
 
   .hero h1 {
-    font-size: 28px;
+    font-size: 25px;
   }
 
   .layout {
-    width: calc(100% - 16px);
-    margin: 10px auto 24px;
-    gap: 12px;
+    width: calc(100% - 12px);
+    margin: 8px auto 22px;
+    gap: 10px;
   }
 
   .panel {
-    padding: 14px;
+    padding: 12px;
     border-radius: 14px;
   }
 
   .panel h2 {
-    font-size: 20px;
+    font-size: 19px;
   }
 
   .search-row,
@@ -468,94 +468,115 @@ footer {
 
   button {
     width: 100%;
-    min-height: 44px;
-    padding: 11px 12px;
+    min-height: 42px;
+    padding: 10px 11px;
   }
 
   .calendar-wrap {
-    overflow-x: visible;
-    padding: 6px;
+    overflow-x: auto;
+    padding: 5px;
     border-radius: 14px;
   }
 
-  .calendar-head,
+  .calendar-head {
+    display: grid;
+  }
+
   .empty-day {
-    display: none;
+    display: block;
   }
 
   .calendar-grid {
-    min-width: 0;
-    grid-template-columns: 1fr;
-    gap: 10px;
+    min-width: 840px;
+    grid-template-columns: repeat(7, 116px);
+    gap: 6px;
+  }
+
+  .calendar-head div {
+    padding: 6px;
+    border-radius: 9px;
+    font-size: 13px;
   }
 
   .calendar-day {
-    min-height: auto;
-    padding: 10px;
-    border-width: 2px;
-    border-radius: 14px;
-  }
-
-  .calendar-day.rest-day {
-    opacity: 1;
+    min-height: 188px;
+    padding: 6px;
+    border-width: 1px;
+    border-radius: 12px;
   }
 
   .day-number {
-    margin: 0 0 10px;
-    padding: 8px 10px;
+    margin: 0 0 6px;
+    padding: 5px 6px;
+    border-radius: 9px;
   }
 
   .day-number strong {
-    min-width: 36px;
-    height: 36px;
-    font-size: 21px;
-  }
-
-  .day-number span {
+    min-width: 27px;
+    height: 27px;
     font-size: 16px;
   }
 
+  .day-number span {
+    font-size: 13px;
+  }
+
   .shift-stack {
-    gap: 8px;
+    gap: 6px;
   }
 
   .shift-pill {
-    padding: 10px;
-    border-radius: 12px;
+    padding: 6px;
+    border-left-width: 5px;
+    border-radius: 10px;
   }
 
   .shift-pill-main {
     align-items: flex-start;
+    gap: 4px;
   }
 
   .shift-pill-main strong {
-    font-size: 15px;
+    font-size: 12px;
     text-align: right;
   }
 
   .shift-code {
-    font-size: 12px;
+    font-size: 10px;
   }
 
   .shift-time,
   .shift-people,
   .release-box {
-    font-size: 13px;
+    font-size: 10.5px;
+    line-height: 1.35;
   }
 
   .shift-action-row {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+  }
+
+  .mini-badge {
+    font-size: 10px;
+    padding: 1px 6px;
   }
 
   .mini-button {
-    min-height: 42px;
-    font-size: 14px;
+    min-height: 34px;
+    min-width: 44px;
+    padding: 4px 7px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .release-box {
+    margin-top: 5px;
+    padding: 5px;
   }
 
   .claim-button {
-    min-height: 42px;
+    min-height: 34px;
   }
 
   .admin-panel table {
