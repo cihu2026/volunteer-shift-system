@@ -13,6 +13,9 @@
   --warn-bg: #fef3c7;
   --danger: #b91c1c;
   --danger-bg: #fee2e2;
+  --apoint: #c2410c;
+  --apoint-bg: #ffedd5;
+  --apoint-line: #fb923c;
 }
 
 * { box-sizing: border-box; }
@@ -291,8 +294,27 @@ button.danger { background: var(--danger); }
   background: #fbfdff;
 }
 
+.shift-pill.a-point {
+  background: var(--apoint-bg);
+  border-color: var(--apoint-line);
+  border-left-color: var(--apoint);
+  box-shadow: 0 3px 10px rgba(194, 65, 12, 0.14);
+}
+
+.shift-pill.a-point .shift-pill-main strong::before {
+  content: 'A點｜';
+  color: var(--apoint);
+  font-weight: 900;
+}
+
+.shift-pill.a-point .shift-time,
+.shift-pill.a-point .shift-people {
+  color: #7c2d12;
+}
+
 .shift-pill.full { background: var(--danger-bg); border-color: #fecaca; border-left-color: var(--danger); }
 .shift-pill.selected { background: var(--ok-bg); border-color: #99f6e4; border-left-color: var(--ok); }
+.shift-pill.selected.a-point { background: #dcfce7; border-color: #86efac; border-left-color: var(--ok); }
 
 .shift-pill-main {
   display: flex;
