@@ -1,8 +1,3 @@
-/**
- * 志工／老師公開選班系統 Apps Script 後端
- * 試算表 ID 已改為 Google 試算表版：1A1gTUYUDlyR7kN47CQYksid37GeMxPOIh4il5ms-ZR4
- */
-
 const CONFIG = {
   SPREADSHEET_ID: '1A1gTUYUDlyR7kN47CQYksid37GeMxPOIh4il5ms-ZR4',
   SHEETS: {
@@ -35,6 +30,7 @@ function handleRequest_(e) {
 
   try {
     let data;
+
     switch (action) {
       case 'setup':
         data = setupSystem();
@@ -69,6 +65,7 @@ function handleRequest_(e) {
       default:
         throw new Error('Unknown action: ' + action);
     }
+
     return jsonResponse_({ ok: true, action, data }, callback);
   } catch (error) {
     return jsonResponse_({ ok: false, action, error: String(error.message || error) }, callback);
@@ -112,7 +109,8 @@ function importTeachersFromWorkbook() {
 
   const ss = getSpreadsheet_();
   const target = ss.getSheetByName(CONFIG.SHEETS.TEACHERS);
-  const existingIds = new Set(tableToObjects_(target).map((row) => String(row.teacherId)));
+  const existing = tableToObjects_(target);
+  const existingIds = new Set(existing.map((row) => String(row.teacherId)));
   const newRows = [];
 
   ss.getSheets().forEach((sheet) => {
@@ -123,17 +121,17 @@ function importTeachersFromWorkbook() {
       for (let c = 0; c < values[r].length - 1; c++) {
         const first = normalizeText_(values[r][c]);
         const second = normalizeText_(values[r][c + 1]);
-        if (first !== '學號' || second !== '姓名') continue;
-
-        for (let i = r + 1; i < values.length; i++) {
-          const id = normalizeText_(values[i][c]);
-          const name = normalizeText_(values[i][c + 1]);
-          if (!id && !name) break;
-          if (!id || !name) continue;
-          if (id === '休園' || name === '休園' || name === '無名額' || id === '無人認養') continue;
-          if (existingIds.has(id)) continue;
-          existingIds.add(id);
-          newRows.push([id, name, true, '', '', '由 ' + sheet.getName() + ' 匯入']);
+        if (first === '學號' && second === '姓名') {
+          for (let i = r + 1; i < values.length; i++) {
+            const id = normalizeText_(values[i][c]);
+            const name = normalizeText_(values[i][c + 1]);
+            if (!id && !name) break;
+            if (!id || !name) continue;
+            if (id === '休園' || name === '休園' || name === '無名額') continue;
+            if (existingIds.has(id)) continue;
+            existingIds.add(id);
+            newRows.push([id, name, true, '', '', '由 ' + sheet.getName() + ' 匯入']);
+          }
         }
       }
     }
@@ -174,7 +172,13 @@ function getPublicData() {
     };
   });
 
-  return { teachers, shifts: shiftsWithState, selections, swaps, generatedAt: new Date().toISOString() };
+  return {
+    teachers,
+    shifts: shiftsWithState,
+    selections,
+    swaps,
+    generatedAt: new Date().toISOString()
+  };
 }
 
 function lookupTeacher(query) {
@@ -189,7 +193,10 @@ function lookupTeacher(query) {
 
   return {
     teacher,
-    selections: selections.map((selection) => ({ ...selection, shift: shiftById[selection.shiftId] || null }))
+    selections: selections.map((selection) => ({
+      ...selection,
+      shift: shiftById[selection.shiftId] || null
+    }))
   };
 }
 
@@ -206,9 +213,10 @@ function selectShift(teacherKey, shiftId) {
     const teacher = findTeacher_(teacherKey);
     if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
+    const shiftsSheet = ss.getSheetByName(CONFIG.SHEETS.SHIFTS);
     const selectionsSheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
-    const shift = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS))
-      .find((row) => String(row.shiftId) === String(shiftId));
+    const shifts = tableToObjects_(shiftsSheet);
+    const shift = shifts.find((row) => String(row.shiftId) === String(shiftId));
     if (!shift) throw new Error('查無此班別。');
     if (String(shift.status || 'open').toLowerCase() === 'closed') throw new Error('這個班別已關閉。');
 
@@ -222,9 +230,24 @@ function selectShift(teacherKey, shiftId) {
     if (selectedCount >= quota) throw new Error('這個班別已額滿。');
 
     const selectionId = 'SEL-' + Utilities.getUuid().slice(0, 8);
-    selectionsSheet.appendRow([selectionId, teacher.teacherId, teacher.name, shift.shiftId, false, new Date(), '', '']);
+    selectionsSheet.appendRow([
+      selectionId,
+      teacher.teacherId,
+      teacher.name,
+      shift.shiftId,
+      false,
+      new Date(),
+      '',
+      ''
+    ]);
 
-    return { selectionId, teacherId: teacher.teacherId, teacherName: teacher.name, shiftId: shift.shiftId, message: '選班成功，請記得按「我知道了」。' };
+    return {
+      selectionId,
+      teacherId: teacher.teacherId,
+      teacherName: teacher.name,
+      shiftId: shift.shiftId,
+      message: '選班成功，請記得按「我知道了」。'
+    };
   } finally {
     lock.releaseLock();
   }
@@ -244,6 +267,7 @@ function confirmShift(teacherKey, shiftId, selectionId) {
     const row = values[r];
     const matchedBySelectionId = selectionId && String(row[index.selectionId]) === String(selectionId);
     const matchedByTeacherAndShift = teacher && String(row[index.teacherId]) === String(teacher.teacherId) && String(row[index.shiftId]) === String(shiftId);
+
     if (matchedBySelectionId || matchedByTeacherAndShift) {
       sheet.getRange(r + 1, index.confirmed + 1).setValue(true);
       sheet.getRange(r + 1, index.confirmedAt + 1).setValue(new Date());
@@ -287,7 +311,8 @@ function findTeacher_(query) {
   const value = normalizeText_(query);
   if (!value) return null;
 
-  const teachers = tableToObjects_(getSpreadsheet_().getSheetByName(CONFIG.SHEETS.TEACHERS));
+  const ss = getSpreadsheet_();
+  const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS));
   return teachers.find((row) => {
     const active = String(row.active).toLowerCase() !== 'false';
     return active && (String(row.teacherId) === value || normalizeText_(row.name) === value);
@@ -295,7 +320,8 @@ function findTeacher_(query) {
 }
 
 function getSpreadsheet_() {
-  return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  if (CONFIG.SPREADSHEET_ID) return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  return SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function ensureSheet_(ss, sheetName, headers) {
@@ -325,13 +351,40 @@ function formatSystemSheets_() {
 
 function tableToObjects_(sheet) {
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const values = sheet.getDataRange().getValues();
+
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  const displayValues = range.getDisplayValues();
   const headers = values[0].map((item) => String(item).trim());
-  return values.slice(1).filter((row) => row.some((cell) => cell !== '')).map((row) => {
+  const timeZone = 'Asia/Taipei';
+
+  return values.slice(1).filter((row) => row.some((cell) => cell !== '')).map((row, rowIndex) => {
     const obj = {};
     headers.forEach((header, i) => {
       const value = row[i];
-      obj[header] = value instanceof Date ? Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm:ss') : value;
+      const displayValue = normalizeText_(displayValues[rowIndex + 1][i]);
+
+      // 排班日期只回傳 yyyy/MM/dd，不要帶 00:00:00，避免前端月曆判斷錯誤。
+      if (header === 'date') {
+        obj[header] = value instanceof Date
+          ? Utilities.formatDate(value, timeZone, 'yyyy/MM/dd')
+          : displayValue;
+        return;
+      }
+
+      // 服務時間、結束時間、報到時間只回傳 HH:mm，不要出現 1899/12/31。
+      if (['startTime', 'endTime', 'reportTime'].includes(header)) {
+        obj[header] = displayValue;
+        return;
+      }
+
+      // 選班、確認、換班建立時間才保留日期＋時間。
+      if (value instanceof Date) {
+        obj[header] = Utilities.formatDate(value, timeZone, 'yyyy/MM/dd HH:mm:ss');
+        return;
+      }
+
+      obj[header] = value;
     });
     return obj;
   });
@@ -367,11 +420,15 @@ function normalizeText_(value) {
 
 function normalizeParams_(e) {
   const params = Object.assign({}, e && e.parameter ? e.parameter : {});
+
   if (e && e.postData && e.postData.contents) {
     try {
       Object.assign(params, JSON.parse(e.postData.contents));
-    } catch (error) {}
+    } catch (error) {
+      // 表單或非 JSON POST 時略過。
+    }
   }
+
   return params;
 }
 
@@ -382,6 +439,7 @@ function jsonResponse_(payload, callback) {
       .createTextOutput(String(callback) + '(' + json + ');')
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
+
   return ContentService
     .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
