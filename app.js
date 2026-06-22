@@ -86,6 +86,7 @@ function normalizePublicData(data) {
   })).filter((shift) => Boolean(shift.date));
   normalized.selections = data.selections || [];
   normalized.swaps = data.swaps || [];
+  normalized.releases = data.releases || [];
   return normalized;
 }
 
@@ -166,18 +167,56 @@ async function confirmSelection(selectionId, shiftId) {
   }
 }
 
-async function requestSwap(originalShiftId) {
+async function releaseMyShift(shiftId) {
   const key = state.teacherKey || document.querySelector('#queryInput').value.trim();
   if (!key) {
     alert('請先輸入學號或姓名。');
     return;
   }
-  const desiredShiftId = prompt('想換到哪一班？可填班別代碼，例如 AUG031；不確定可留空。', '') || '';
-  const note = prompt('換班備註，例如：想找人互換、那天臨時有事。', '') || '';
+  const note = prompt('釋出原因／備註，可留空。例如：當天有事，請其他老師認領。', '') || '';
+  if (!confirm(`確定要把 ${shiftId} 釋出給其他老師認領嗎？\n在別人認領前，這班仍算在你名下。`)) return;
+
   try {
-    const result = await apiGet({ action: 'requestSwap', teacherKey: key, originalShiftId, desiredShiftId, note });
-    alert(result.message || '已建立換班申請。');
+    const result = await apiGet({ action: 'releaseShift', teacherKey: key, shiftId, note });
+    alert(result.message || '已釋出，等待其他老師認領。');
     await loadPublicData();
+    await queryMySchedule();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function cancelRelease(shiftId) {
+  const key = state.teacherKey || document.querySelector('#queryInput').value.trim();
+  if (!key) {
+    alert('請先輸入學號或姓名。');
+    return;
+  }
+  if (!confirm(`確定取消釋出 ${shiftId} 嗎？`)) return;
+
+  try {
+    const result = await apiGet({ action: 'cancelRelease', teacherKey: key, shiftId });
+    alert(result.message || '已取消釋出。');
+    await loadPublicData();
+    await queryMySchedule();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function claimReleasedShift(shiftId) {
+  const key = state.teacherKey || document.querySelector('#queryInput').value.trim();
+  if (!key) {
+    alert('請先輸入學號或姓名，再認領。');
+    return;
+  }
+  if (!confirm(`確定要認領 ${shiftId} 嗎？\n認領後這班會轉到你的名下，並需要重新按「我知道了」。`)) return;
+
+  try {
+    const result = await apiGet({ action: 'claimReleasedShift', teacherKey: key, shiftId });
+    alert(result.message || '認領成功。');
+    await loadPublicData();
+    await queryMySchedule();
   } catch (error) {
     alert(error.message);
   }
@@ -224,6 +263,17 @@ function renderMySchedule() {
     const shift = item.shift || {};
     const statusClass = isTrue(item.confirmed) ? 'ok' : 'warn';
     const statusText = isTrue(item.confirmed) ? '已確認收到提醒' : '尚未確認';
+    const release = findOpenReleaseForShift(item.shiftId, teacher.teacherId);
+    const releaseControls = release
+      ? `
+        <div class="release-box compact">
+          <strong>此班已釋出待認領</strong><br>
+          <span>${escapeHtml(release.note || '等待其他老師認領')}</span>
+        </div>
+        <button class="danger" type="button" onclick="cancelRelease('${escapeAttr(item.shiftId)}')">取消釋出</button>
+      `
+      : `<button type="button" onclick="releaseMyShift('${escapeAttr(item.shiftId)}')">我要釋出這班</button>`;
+
     return `
       <article class="card">
         <div class="card-title-row">
@@ -236,7 +286,7 @@ function renderMySchedule() {
         ${isTrue(item.confirmed)
           ? `<p class="hint">確認時間：${escapeHtml(formatDateTime(item.confirmedAt))}</p>`
           : `<button class="secondary" type="button" onclick="confirmSelection('${escapeAttr(item.selectionId)}', '${escapeAttr(item.shiftId)}')">我知道了</button>`}
-        <button type="button" onclick="requestSwap('${escapeAttr(item.shiftId)}')">我要申請換班</button>
+        ${releaseControls}
       </article>
     `;
   }).join('');
@@ -262,6 +312,7 @@ function renderShiftCalendar() {
 
   const selectedShiftIds = new Set(((state.teacherResult && state.teacherResult.selections) || []).map((item) => item.shiftId));
   const shiftsByDate = groupBy(shifts, 'date');
+  const releaseMap = keyOpenReleasesByShift();
   const monthLabel = getMonthLabel(shifts[0].date);
   const [year, month] = shifts[0].date.split('/').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -276,7 +327,7 @@ function renderShiftCalendar() {
     const dayShifts = shiftsByDate[dateKey] || [];
     const isTuesday = weekday === '二';
     const shiftHtml = dayShifts.length
-      ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds)).join('')
+      ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds, releaseMap)).join('')
       : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開放'}</div>`;
 
     cells.push(`
@@ -288,8 +339,8 @@ function renderShiftCalendar() {
   }
 
   const loginHint = state.teacherKey
-    ? `目前以「${escapeHtml(state.teacherKey)}」選班。看到想要的班，直接按「選」。`
-    : '先在上方輸入學號或姓名；輸入後月曆裡會出現「選」按鈕。';
+    ? `目前以「${escapeHtml(state.teacherKey)}」選班。看到想要的班，直接按「選」；看到「釋出中」可以按「我要認領」。`
+    : '先在上方輸入學號或姓名；輸入後月曆裡會出現「選」或「我要認領」按鈕。';
 
   target.innerHTML = `
     <div class="month-toolbar">
@@ -308,25 +359,38 @@ function renderShiftCalendar() {
   `;
 }
 
-function renderShiftInCalendar(shift, selectedShiftIds) {
+function renderShiftInCalendar(shift, selectedShiftIds, releaseMap) {
+  const release = releaseMap[String(shift.shiftId)] || null;
   const full = Number(shift.remaining) <= 0;
   const alreadySelected = selectedShiftIds.has(shift.shiftId);
   const hasKey = Boolean(state.teacherKey);
-  const disabled = full || alreadySelected || !hasKey;
+  const isAPoint = String(shift.site || '').includes('A點') || String(shift.duty || '').includes('A點');
+  const normalSelectDisabled = full || alreadySelected || !hasKey || Boolean(release);
   const people = (shift.selectedPeople || []).map((person) => `${escapeHtml(person.teacherName)}${isTrue(person.confirmed) ? '✅' : '⚠️'}`).join('、') || '尚無人';
-  const statusText = alreadySelected ? '已選' : full ? '滿' : hasKey ? '選' : '輸入後選';
+  const statusText = release ? '釋出中' : alreadySelected ? '已選' : full ? '滿' : hasKey ? '選' : '輸入後選';
+  const releaseIsMine = release && sameTeacherKey(release);
+  const claimDisabled = !hasKey || alreadySelected || releaseIsMine;
+  const claimText = !hasKey ? '輸入後認領' : releaseIsMine ? '自己釋出中' : '我要認領';
+  const releaseHtml = release ? `
+    <div class="release-box">
+      <strong>${escapeHtml(release.teacherName)} 釋出中</strong><br>
+      <span>${escapeHtml(release.note || '等待其他老師認領')}</span>
+      <button class="mini-button claim-button" type="button" ${claimDisabled ? 'disabled' : ''} onclick="claimReleasedShift('${escapeAttr(shift.shiftId)}')">${claimText}</button>
+    </div>
+  ` : '';
 
   return `
-    <div class="shift-pill ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''}">
+    <div class="shift-pill ${isAPoint ? 'a-point' : ''} ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''} ${release ? 'released' : ''}">
       <div class="shift-pill-main">
         <span class="shift-code">${escapeHtml(shift.shiftId)}</span>
         <strong>${escapeHtml(shift.duty)}</strong>
       </div>
       <div class="shift-time">${escapeHtml(shift.startTime)}－${escapeHtml(shift.endTime)}｜${escapeHtml(shift.site)}</div>
       <div class="shift-people">${people}</div>
+      ${releaseHtml}
       <div class="shift-action-row">
         <span class="mini-badge">${escapeHtml(shift.selectedCount)} / ${escapeHtml(shift.quota)}</span>
-        <button class="mini-button" type="button" ${disabled ? 'disabled' : ''} onclick="selectShift('${escapeAttr(shift.shiftId)}')">${statusText}</button>
+        <button class="mini-button" type="button" ${normalSelectDisabled ? 'disabled' : ''} onclick="selectShift('${escapeAttr(shift.shiftId)}')">${statusText}</button>
       </div>
     </div>
   `;
@@ -359,22 +423,46 @@ function renderAdminPanel() {
       }).join('')
     : '<tr><td colspan="4">目前沒有任何選班紀錄。</td></tr>';
   const swapRows = swaps.length
-    ? swaps.map((item) => `
-        <tr>
-          <td>${escapeHtml(item.teacherName)}<br><span class="hint">${escapeHtml(item.teacherId)}</span></td>
-          <td>${escapeHtml(item.originalShiftId)}</td>
-          <td>${escapeHtml(item.desiredShiftId || '未指定')}</td>
-          <td>${escapeHtml(item.note || '')}<br><span class="badge warn">${escapeHtml(item.status || 'open')}</span></td>
-        </tr>
-      `).join('')
-    : '<tr><td colspan="4">目前沒有換班申請。</td></tr>';
+    ? swaps.map((item) => {
+        const isRelease = String(item.desiredShiftId || '') === 'RELEASE';
+        const targetText = isRelease ? '待認領' : escapeHtml(item.desiredShiftId || '未指定');
+        const statusClass = String(item.status || 'open') === 'completed' ? 'ok' : 'warn';
+        return `
+          <tr>
+            <td>${escapeHtml(item.teacherName)}<br><span class="hint">${escapeHtml(item.teacherId)}</span></td>
+            <td>${escapeHtml(item.originalShiftId)}</td>
+            <td>${targetText}</td>
+            <td>${escapeHtml(item.note || '')}<br><span class="badge ${statusClass}">${escapeHtml(item.status || 'open')}</span></td>
+          </tr>
+        `;
+      }).join('')
+    : '<tr><td colspan="4">目前沒有換班／釋出申請。</td></tr>';
 
   panel.innerHTML = `
     <h3>選班與確認狀態</h3>
     <table><thead><tr><th>人員</th><th>班別</th><th>時間</th><th>確認</th></tr></thead><tbody>${selectionRows}</tbody></table>
-    <h3>換班申請</h3>
-    <table><thead><tr><th>人員</th><th>原班別</th><th>想換到</th><th>備註／狀態</th></tr></thead><tbody>${swapRows}</tbody></table>
+    <h3>釋出認領／換班紀錄</h3>
+    <table><thead><tr><th>人員</th><th>原班別</th><th>處理方式</th><th>備註／狀態</th></tr></thead><tbody>${swapRows}</tbody></table>
   `;
+}
+
+function keyOpenReleasesByShift() {
+  const releases = ((state.publicData && state.publicData.releases) || []).filter((item) => String(item.status || 'open') === 'open');
+  return releases.reduce((acc, item) => {
+    acc[String(item.originalShiftId)] = item;
+    return acc;
+  }, {});
+}
+
+function findOpenReleaseForShift(shiftId, teacherId) {
+  const releases = ((state.publicData && state.publicData.releases) || []).filter((item) => String(item.status || 'open') === 'open');
+  return releases.find((item) => String(item.originalShiftId) === String(shiftId) && String(item.teacherId) === String(teacherId)) || null;
+}
+
+function sameTeacherKey(release) {
+  const key = normalizePlainText(state.teacherKey || (document.querySelector('#queryInput') && document.querySelector('#queryInput').value));
+  if (!key || !release) return false;
+  return String(release.teacherId) === key || normalizePlainText(release.teacherName) === key;
 }
 
 function groupBy(rows, key) {
@@ -405,6 +493,10 @@ function formatDateTime(value) {
 
 function isTrue(value) {
   return value === true || String(value).toLowerCase() === 'true';
+}
+
+function normalizePlainText(value) {
+  return String(value == null ? '' : value).trim();
 }
 
 function escapeHtml(value) {
