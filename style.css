@@ -426,6 +426,33 @@ footer {
 }
 
 @media (max-width: 720px) {
+  body {
+    font-size: 16px;
+  }
+
+  .hero {
+    padding: 22px 14px;
+  }
+
+  .hero h1 {
+    font-size: 28px;
+  }
+
+  .layout {
+    width: calc(100% - 16px);
+    margin: 10px auto 24px;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .panel h2 {
+    font-size: 20px;
+  }
+
   .search-row,
   .section-title-row,
   .card-title-row,
@@ -433,9 +460,105 @@ footer {
     display: grid;
     grid-template-columns: 1fr;
   }
-  button { width: 100%; }
-  .calendar-wrap { padding: 6px; }
-  .calendar-grid { min-width: 1120px; grid-template-columns: repeat(7, 152px); gap: 7px; }
-  .calendar-day { min-height: 250px; padding: 8px; border-width: 2px; }
-  .day-number strong { min-width: 32px; height: 32px; }
+
+  input,
+  button {
+    font-size: 16px;
+  }
+
+  button {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 12px;
+  }
+
+  .calendar-wrap {
+    overflow-x: visible;
+    padding: 6px;
+    border-radius: 14px;
+  }
+
+  .calendar-head,
+  .empty-day {
+    display: none;
+  }
+
+  .calendar-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .calendar-day {
+    min-height: auto;
+    padding: 10px;
+    border-width: 2px;
+    border-radius: 14px;
+  }
+
+  .calendar-day.rest-day {
+    opacity: 1;
+  }
+
+  .day-number {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+  }
+
+  .day-number strong {
+    min-width: 36px;
+    height: 36px;
+    font-size: 21px;
+  }
+
+  .day-number span {
+    font-size: 16px;
+  }
+
+  .shift-stack {
+    gap: 8px;
+  }
+
+  .shift-pill {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .shift-pill-main {
+    align-items: flex-start;
+  }
+
+  .shift-pill-main strong {
+    font-size: 15px;
+    text-align: right;
+  }
+
+  .shift-code {
+    font-size: 12px;
+  }
+
+  .shift-time,
+  .shift-people,
+  .release-box {
+    font-size: 13px;
+  }
+
+  .shift-action-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+
+  .mini-button {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .claim-button {
+    min-height: 42px;
+  }
+
+  .admin-panel table {
+    min-width: 620px;
+  }
 }
