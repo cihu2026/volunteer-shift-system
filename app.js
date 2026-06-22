@@ -326,13 +326,16 @@ function renderShiftCalendar() {
     const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
     const dayShifts = shiftsByDate[dateKey] || [];
     const isTuesday = weekday === '二';
+    const dayQuota = sumNumbers(dayShifts, 'quota', 1);
+    const dayMissing = sumNumbers(dayShifts, 'remaining', 0);
+    const dayShortageClass = getShortageClass(dayMissing, dayQuota, 'day');
     const shiftHtml = dayShifts.length
       ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds, releaseMap)).join('')
       : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開放'}</div>`;
-    const dayTag = dayShifts.length ? `${dayShifts.length}班` : (isTuesday ? '休園' : '');
+    const dayTag = dayShifts.length ? (dayMissing > 0 ? `缺${dayMissing}` : '已滿') : (isTuesday ? '休園' : '');
 
     cells.push(`
-      <div class="calendar-day ${isTuesday ? 'rest-day' : ''} ${dayShifts.length ? 'has-shifts' : ''}">
+      <div class="calendar-day ${isTuesday ? 'rest-day' : ''} ${dayShifts.length ? 'has-shifts' : ''} ${dayShortageClass}">
         <button class="day-number day-toggle" type="button" onclick="toggleCalendarDay(this)" aria-expanded="false">
           <strong>${day}</strong><span>${weekday}</span><em>${escapeHtml(dayTag)}</em>
         </button>
@@ -342,8 +345,8 @@ function renderShiftCalendar() {
   }
 
   const loginHint = state.teacherKey
-    ? `目前以「${escapeHtml(state.teacherKey)}」選班。手機請點日期展開班別；看到「釋出中」可以按「我要認領」。`
-    : '先在上方輸入學號或姓名；手機請點日期展開班別。';
+    ? `目前以「${escapeHtml(state.teacherKey)}」選班。手機請點日期展開班別；顏色越深代表缺班越多。`
+    : '先在上方輸入學號或姓名；手機請點日期展開班別；顏色越深代表缺班越多。';
 
   target.innerHTML = `
     <div class="month-toolbar">
@@ -381,13 +384,16 @@ function toggleCalendarDay(button) {
 
 function renderShiftInCalendar(shift, selectedShiftIds, releaseMap) {
   const release = releaseMap[String(shift.shiftId)] || null;
-  const full = Number(shift.remaining) <= 0;
+  const quota = Number(shift.quota || 1);
+  const remaining = Number(shift.remaining || 0);
+  const full = remaining <= 0;
   const alreadySelected = selectedShiftIds.has(shift.shiftId);
   const hasKey = Boolean(state.teacherKey);
   const isAPoint = String(shift.site || '').includes('A點') || String(shift.duty || '').includes('A點');
+  const shortageClass = getShortageClass(remaining, quota, 'shift');
   const normalSelectDisabled = full || alreadySelected || !hasKey || Boolean(release);
   const people = (shift.selectedPeople || []).map((person) => `${escapeHtml(person.teacherName)}${isTrue(person.confirmed) ? '✅' : '⚠️'}`).join('、') || '尚無人';
-  const statusText = release ? '釋出中' : alreadySelected ? '已選' : full ? '滿' : hasKey ? '選' : '輸入後選';
+  const statusText = release ? '釋出中' : alreadySelected ? '已選' : full ? '滿' : `缺${remaining}`;
   const releaseIsMine = release && sameTeacherKey(release);
   const claimDisabled = !hasKey || alreadySelected || releaseIsMine;
   const claimText = !hasKey ? '輸入後認領' : releaseIsMine ? '自己釋出中' : '我要認領';
@@ -400,7 +406,7 @@ function renderShiftInCalendar(shift, selectedShiftIds, releaseMap) {
   ` : '';
 
   return `
-    <div class="shift-pill ${isAPoint ? 'a-point' : ''} ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''} ${release ? 'released' : ''}">
+    <div class="shift-pill ${shortageClass} ${isAPoint ? 'a-point' : ''} ${full ? 'full' : ''} ${alreadySelected ? 'selected' : ''} ${release ? 'released' : ''}">
       <div class="shift-pill-main">
         <span class="shift-code">${escapeHtml(shift.shiftId)}</span>
         <strong>${escapeHtml(shift.duty)}</strong>
@@ -483,6 +489,24 @@ function sameTeacherKey(release) {
   const key = normalizePlainText(state.teacherKey || (document.querySelector('#queryInput') && document.querySelector('#queryInput').value));
   if (!key || !release) return false;
   return String(release.teacherId) === key || normalizePlainText(release.teacherName) === key;
+}
+
+function getShortageClass(remaining, quota, prefix) {
+  const missing = Number(remaining || 0);
+  const total = Number(quota || 0);
+  if (total <= 0) return `${prefix}-filled`;
+  if (missing <= 0) return `${prefix}-filled`;
+  const ratio = missing / total;
+  if (ratio >= 0.75) return `${prefix}-missing-high`;
+  if (ratio >= 0.4) return `${prefix}-missing-medium`;
+  return `${prefix}-missing-low`;
+}
+
+function sumNumbers(rows, key, fallback) {
+  return rows.reduce((sum, row) => {
+    const value = Number(row[key]);
+    return sum + (Number.isFinite(value) ? value : fallback);
+  }, 0);
 }
 
 function groupBy(rows, key) {
