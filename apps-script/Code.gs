@@ -62,6 +62,18 @@ function handleRequest_(e) {
           params.note || ''
         );
         break;
+      case 'releaseShift':
+      case 'release':
+        data = releaseShift(params.teacherKey || params.teacherId || params.name || '', params.shiftId || '', params.note || '');
+        break;
+      case 'cancelRelease':
+        data = cancelRelease(params.teacherKey || params.teacherId || params.name || '', params.shiftId || '');
+        break;
+      case 'claimReleasedShift':
+      case 'claimRelease':
+      case 'claim':
+        data = claimReleasedShift(params.teacherKey || params.teacherId || params.name || '', params.shiftId || '');
+        break;
       default:
         throw new Error('Unknown action: ' + action);
     }
@@ -154,6 +166,7 @@ function getPublicData() {
     .filter((row) => String(row.status || 'open').toLowerCase() !== 'closed');
   const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
   const swaps = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SWAPS));
+  const releases = swaps.filter((row) => isReleaseRequest_(row) && String(row.status || 'open') === 'open');
 
   const selectionMap = groupBy_(selections, 'shiftId');
   const shiftsWithState = shifts.map((shift) => {
@@ -177,6 +190,7 @@ function getPublicData() {
     shifts: shiftsWithState,
     selections,
     swaps,
+    releases,
     generatedAt: new Date().toISOString()
   };
 }
@@ -306,6 +320,156 @@ function requestSwap(teacherKey, originalShiftId, desiredShiftId, note) {
   return { requestId, message: '已建立換班申請。' };
 }
 
+function releaseShift(teacherKey, shiftId, note) {
+  if (!teacherKey) throw new Error('請輸入學號或姓名。');
+  if (!shiftId) throw new Error('缺少 shiftId。');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+
+  try {
+    setupSystem();
+    const ss = getSpreadsheet_();
+    const teacher = findTeacher_(teacherKey);
+    if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
+
+    const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
+    const hasShift = selections.some((row) => String(row.teacherId) === String(teacher.teacherId) && String(row.shiftId) === String(shiftId));
+    if (!hasShift) throw new Error('你沒有這個班，不能釋出。');
+
+    const swapSheet = ss.getSheetByName(CONFIG.SHEETS.SWAPS);
+    const existing = tableToObjects_(swapSheet).find((row) => {
+      return isReleaseRequest_(row)
+        && String(row.status || 'open') === 'open'
+        && String(row.teacherId) === String(teacher.teacherId)
+        && String(row.originalShiftId) === String(shiftId);
+    });
+    if (existing) throw new Error('這班已經釋出待認領。');
+
+    const requestId = 'REL-' + Utilities.getUuid().slice(0, 8);
+    swapSheet.appendRow([
+      requestId,
+      teacher.teacherId,
+      teacher.name,
+      shiftId,
+      'RELEASE',
+      note || '釋出待認領',
+      'open',
+      new Date()
+    ]);
+
+    return { requestId, shiftId, message: '已釋出，等待其他老師認領。' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelRelease(teacherKey, shiftId) {
+  if (!teacherKey) throw new Error('請輸入學號或姓名。');
+  if (!shiftId) throw new Error('缺少 shiftId。');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+
+  try {
+    setupSystem();
+    const ss = getSpreadsheet_();
+    const teacher = findTeacher_(teacherKey);
+    if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
+
+    const swapSheet = ss.getSheetByName(CONFIG.SHEETS.SWAPS);
+    const rowInfo = findOpenReleaseRow_(swapSheet, shiftId, teacher.teacherId);
+    if (!rowInfo) throw new Error('找不到可取消的釋出紀錄。');
+
+    swapSheet.getRange(rowInfo.rowNumber, rowInfo.index.status + 1).setValue('cancelled');
+    swapSheet.getRange(rowInfo.rowNumber, rowInfo.index.note + 1).setValue((rowInfo.row[rowInfo.index.note] || '') + '｜取消釋出');
+    return { shiftId, message: '已取消釋出。' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function claimReleasedShift(teacherKey, shiftId) {
+  if (!teacherKey) throw new Error('請輸入學號或姓名。');
+  if (!shiftId) throw new Error('缺少 shiftId。');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+
+  try {
+    setupSystem();
+    const ss = getSpreadsheet_();
+    const claimant = findTeacher_(teacherKey);
+    if (!claimant) throw new Error('查無此人，請確認學號或姓名。');
+
+    const swapSheet = ss.getSheetByName(CONFIG.SHEETS.SWAPS);
+    const releaseInfo = findOpenReleaseRow_(swapSheet, shiftId, null);
+    if (!releaseInfo) throw new Error('這班目前沒有開放認領，可能已被認領或取消。');
+
+    const originalTeacherId = String(releaseInfo.row[releaseInfo.index.teacherId]);
+    const originalTeacherName = String(releaseInfo.row[releaseInfo.index.teacherName]);
+    if (String(claimant.teacherId) === originalTeacherId) throw new Error('這是你自己釋出的班，不能自己認領。');
+
+    const selectionsSheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
+    const values = selectionsSheet.getDataRange().getValues();
+    const headers = values[0];
+    const index = headerIndex_(headers);
+
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      if (String(row[index.teacherId]) === String(claimant.teacherId) && String(row[index.shiftId]) === String(shiftId)) {
+        throw new Error('你已經有這一班，不能重複認領。');
+      }
+    }
+
+    let selectionRowNumber = null;
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      if (String(row[index.teacherId]) === originalTeacherId && String(row[index.shiftId]) === String(shiftId)) {
+        selectionRowNumber = r + 1;
+        break;
+      }
+    }
+    if (!selectionRowNumber) throw new Error('找不到原老師的選班紀錄，無法認領。');
+
+    selectionsSheet.getRange(selectionRowNumber, index.teacherId + 1).setValue(claimant.teacherId);
+    selectionsSheet.getRange(selectionRowNumber, index.teacherName + 1).setValue(claimant.name);
+    selectionsSheet.getRange(selectionRowNumber, index.confirmed + 1).setValue(false);
+    selectionsSheet.getRange(selectionRowNumber, index.confirmedAt + 1).setValue('');
+    selectionsSheet.getRange(selectionRowNumber, index.note + 1).setValue('由 ' + originalTeacherName + ' 釋出，' + claimant.name + ' 認領');
+
+    swapSheet.getRange(releaseInfo.rowNumber, releaseInfo.index.status + 1).setValue('completed');
+    swapSheet.getRange(releaseInfo.rowNumber, releaseInfo.index.note + 1).setValue((releaseInfo.row[releaseInfo.index.note] || '') + '｜由 ' + claimant.name + ' 認領');
+
+    return { shiftId, teacherId: claimant.teacherId, teacherName: claimant.name, message: '認領成功，請記得按「我知道了」。' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findOpenReleaseRow_(sheet, shiftId, teacherId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  const headers = values[0];
+  const index = headerIndex_(headers);
+
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r];
+    const isTargetShift = String(row[index.originalShiftId]) === String(shiftId);
+    const isTargetTeacher = teacherId == null || String(row[index.teacherId]) === String(teacherId);
+    const isOpen = String(row[index.status] || 'open') === 'open';
+    const isRelease = String(row[index.desiredShiftId]) === 'RELEASE';
+    if (isTargetShift && isTargetTeacher && isOpen && isRelease) {
+      return { rowNumber: r + 1, row, index };
+    }
+  }
+  return null;
+}
+
+function isReleaseRequest_(row) {
+  return String(row.desiredShiftId || '') === 'RELEASE' || String(row.requestId || '').startsWith('REL-');
+}
+
 function findTeacher_(query) {
   setupSystem();
   const value = normalizeText_(query);
@@ -364,7 +528,6 @@ function tableToObjects_(sheet) {
       const value = row[i];
       const displayValue = normalizeText_(displayValues[rowIndex + 1][i]);
 
-      // 排班日期只回傳 yyyy/MM/dd，不要帶 00:00:00，避免前端月曆判斷錯誤。
       if (header === 'date') {
         obj[header] = value instanceof Date
           ? Utilities.formatDate(value, timeZone, 'yyyy/MM/dd')
@@ -372,13 +535,11 @@ function tableToObjects_(sheet) {
         return;
       }
 
-      // 服務時間、結束時間、報到時間只回傳 HH:mm，不要出現 1899/12/31。
       if (['startTime', 'endTime', 'reportTime'].includes(header)) {
         obj[header] = displayValue;
         return;
       }
 
-      // 選班、確認、換班建立時間才保留日期＋時間。
       if (value instanceof Date) {
         obj[header] = Utilities.formatDate(value, timeZone, 'yyyy/MM/dd HH:mm:ss');
         return;
