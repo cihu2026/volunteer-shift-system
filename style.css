@@ -25,18 +25,18 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .hero {
-  padding: 32px 20px;
+  padding: 26px 18px;
   background: linear-gradient(135deg, #111827, #374151);
   color: #fff;
 }
 
 .hero h1 {
   margin: 4px 0 8px;
-  font-size: clamp(28px, 6vw, 46px);
+  font-size: clamp(26px, 5vw, 40px);
   line-height: 1.15;
 }
 
@@ -45,7 +45,7 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.8;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .subtitle {
@@ -55,28 +55,28 @@ body {
 }
 
 .layout {
-  width: min(1280px, calc(100% - 32px));
-  margin: 24px auto;
+  width: min(1220px, calc(100% - 24px));
+  margin: 18px auto;
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .panel h2 {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .hint,
 .notice p {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   color: var(--muted);
 }
 
@@ -104,14 +104,14 @@ input {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   background: #fff;
 }
 
 button {
   border: 0;
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 11px 15px;
   background: var(--brand);
   color: #fff;
   font-weight: 700;
@@ -125,28 +125,29 @@ button.danger { background: var(--danger); }
 
 .cards {
   display: grid;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .card {
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 15px;
+  padding: 14px;
   background: #fbfdff;
 }
 
 .card-title-row,
-.section-title-row {
+.section-title-row,
+.month-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .card h3 {
   margin: 0 0 8px;
-  font-size: 19px;
+  font-size: 18px;
 }
 
 .card p { margin: 4px 0; }
@@ -169,63 +170,53 @@ button.danger { background: var(--danger); }
 
 .empty {
   color: var(--muted);
-  padding: 16px;
+  padding: 14px;
   border: 1px dashed var(--line);
   border-radius: 14px;
   background: #f8fafc;
 }
 
-.month-toolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 4px 0 12px;
-}
-
-.month-toolbar h3 {
-  margin: 0 0 4px;
-  font-size: 24px;
-}
+.month-toolbar { margin: 4px 0 10px; }
+.month-toolbar h3 { margin: 0 0 4px; font-size: 22px; }
 
 .calendar-wrap {
   overflow-x: auto;
   border: 2px solid var(--strong-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #e2e8f0;
-  padding: 8px;
+  padding: 7px;
 }
 
 .calendar-grid {
-  min-width: 1260px;
+  min-width: 1080px;
   display: grid;
-  grid-template-columns: repeat(7, minmax(170px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  gap: 7px;
 }
 
 .calendar-head {
   position: sticky;
   top: 0;
   z-index: 1;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 .calendar-head div {
-  padding: 10px;
+  padding: 8px;
   text-align: center;
   font-weight: 900;
   color: #fff;
   background: #334155;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .calendar-day {
-  min-height: 270px;
-  padding: 10px;
-  border: 2px solid #cbd5e1;
-  border-radius: 16px;
+  min-height: 235px;
+  padding: 8px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.08);
 }
 
 .calendar-day:nth-child(odd) { background: #ffffff; }
@@ -245,9 +236,9 @@ button.danger { background: var(--danger); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: -2px -2px 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
   background: #e0f2fe;
   border: 1px solid #bae6fd;
 }
@@ -256,41 +247,38 @@ button.danger { background: var(--danger); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 34px;
+  min-width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: #0f172a;
   color: #fff;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .day-number span {
   color: #0f172a;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
 }
 
 .rest-note {
   border: 2px dashed #94a3b8;
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 10px;
   color: #475569;
   background: #f8fafc;
   text-align: center;
   font-weight: 800;
 }
 
-.shift-stack {
-  display: grid;
-  gap: 9px;
-}
+.shift-stack { display: grid; gap: 7px; }
 
 .shift-pill {
   border: 1px solid #cbd5e1;
-  border-left: 6px solid #334155;
-  border-radius: 12px;
-  padding: 9px;
+  border-left: 5px solid #334155;
+  border-radius: 10px;
+  padding: 7px;
   background: #fbfdff;
 }
 
@@ -308,40 +296,26 @@ button.danger { background: var(--danger); }
 }
 
 .shift-pill.a-point .shift-time,
-.shift-pill.a-point .shift-people {
-  color: #7c2d12;
-}
+.shift-pill.a-point .shift-people { color: #7c2d12; }
 
 .shift-pill.released {
-  outline: 3px solid #facc15;
+  outline: 2px solid #facc15;
   background: #fffbeb;
 }
 
 .release-box {
-  margin-top: 8px;
-  padding: 8px;
-  border-radius: 10px;
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: 9px;
   border: 1px solid #f59e0b;
   background: #fef3c7;
   color: #78350f;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
-
-.release-box.compact {
-  margin: 10px 0;
-  font-size: 14px;
-}
-
-.release-box span {
-  font-weight: 600;
-}
-
-.claim-button {
-  margin-top: 7px;
-  width: 100%;
-  background: #92400e;
-}
+.release-box.compact { margin: 9px 0; font-size: 13px; }
+.release-box span { font-weight: 600; }
+.claim-button { margin-top: 6px; width: 100%; background: #92400e; }
 
 .shift-pill.full { background: var(--danger-bg); border-color: #fecaca; border-left-color: var(--danger); }
 .shift-pill.selected { background: var(--ok-bg); border-color: #99f6e4; border-left-color: var(--ok); }
@@ -351,60 +325,38 @@ button.danger { background: var(--danger); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 5px;
 }
-
-.shift-pill-main strong { font-size: 14px; }
-
-.shift-code {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 800;
-}
-
+.shift-pill-main strong { font-size: 13px; }
+.shift-code { font-size: 10px; color: var(--muted); font-weight: 800; }
 .shift-time,
-.shift-people {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-}
+.shift-people { margin-top: 3px; color: var(--muted); font-size: 11px; }
 
 .shift-action-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-top: 7px;
+  gap: 7px;
+  margin-top: 6px;
 }
-
 .mini-badge {
   display: inline-flex;
   border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
+  padding: 2px 7px;
+  font-size: 11px;
   background: var(--brand-soft);
   color: var(--brand);
   font-weight: 800;
 }
-
 .mini-button {
-  padding: 6px 10px;
-  border-radius: 9px;
-  font-size: 12px;
-  min-width: 52px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  min-width: 48px;
 }
 
-.admin-panel {
-  overflow-x: auto;
-  margin-top: 12px;
-}
-
-.admin-panel table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 680px;
-}
-
+.admin-panel { overflow-x: auto; margin-top: 12px; }
+.admin-panel table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .admin-panel th,
 .admin-panel td {
   border-bottom: 1px solid var(--line);
@@ -412,46 +364,25 @@ button.danger { background: var(--danger); }
   padding: 10px;
   vertical-align: top;
 }
-
-.admin-panel th {
-  background: #f8fafc;
-  font-weight: 800;
-}
+.admin-panel th { background: #f8fafc; font-weight: 800; }
 
 footer {
-  width: min(1280px, calc(100% - 32px));
-  margin: 10px auto 32px;
+  width: min(1220px, calc(100% - 24px));
+  margin: 10px auto 28px;
   color: var(--muted);
   text-align: center;
 }
 
 @media (max-width: 720px) {
-  body {
-    font-size: 15px;
-  }
-
-  .hero {
-    padding: 18px 12px;
-  }
-
-  .hero h1 {
-    font-size: 25px;
-  }
-
-  .layout {
-    width: calc(100% - 12px);
-    margin: 8px auto 22px;
-    gap: 10px;
-  }
-
-  .panel {
-    padding: 12px;
-    border-radius: 14px;
-  }
-
-  .panel h2 {
-    font-size: 19px;
-  }
+  body { font-size: 14px; }
+  .hero { padding: 14px 10px; }
+  .hero h1 { font-size: 22px; }
+  .eyebrow { font-size: 10px; }
+  .subtitle { font-size: 13px; }
+  .layout { width: calc(100% - 8px); margin: 6px auto 18px; gap: 8px; }
+  .panel { padding: 9px; border-radius: 12px; }
+  .panel h2 { font-size: 17px; }
+  .hint, .notice p { font-size: 12px; margin-bottom: 8px; }
 
   .search-row,
   .section-title-row,
@@ -461,125 +392,93 @@ footer {
     grid-template-columns: 1fr;
   }
 
-  input,
-  button {
-    font-size: 16px;
-  }
-
-  button {
-    width: 100%;
-    min-height: 42px;
-    padding: 10px 11px;
-  }
+  input, button { font-size: 16px; }
+  button { width: 100%; min-height: 40px; padding: 9px 10px; }
 
   .calendar-wrap {
-    overflow-x: auto;
-    padding: 5px;
-    border-radius: 14px;
-  }
-
-  .calendar-head {
-    display: grid;
-  }
-
-  .empty-day {
-    display: block;
-  }
-
-  .calendar-grid {
-    min-width: 840px;
-    grid-template-columns: repeat(7, 116px);
-    gap: 6px;
-  }
-
-  .calendar-head div {
-    padding: 6px;
-    border-radius: 9px;
-    font-size: 13px;
-  }
-
-  .calendar-day {
-    min-height: 188px;
-    padding: 6px;
-    border-width: 1px;
+    overflow-x: hidden;
+    padding: 3px;
     border-radius: 12px;
   }
 
-  .day-number {
-    margin: 0 0 6px;
-    padding: 5px 6px;
-    border-radius: 9px;
+  .calendar-grid {
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
   }
 
-  .day-number strong {
-    min-width: 27px;
-    height: 27px;
-    font-size: 16px;
-  }
-
-  .day-number span {
-    font-size: 13px;
-  }
-
-  .shift-stack {
-    gap: 6px;
-  }
-
-  .shift-pill {
-    padding: 6px;
-    border-left-width: 5px;
-    border-radius: 10px;
-  }
-
-  .shift-pill-main {
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .shift-pill-main strong {
-    font-size: 12px;
-    text-align: right;
-  }
-
-  .shift-code {
-    font-size: 10px;
-  }
-
-  .shift-time,
-  .shift-people,
-  .release-box {
-    font-size: 10.5px;
-    line-height: 1.35;
-  }
-
-  .shift-action-row {
-    gap: 5px;
-    margin-top: 5px;
-  }
-
-  .mini-badge {
-    font-size: 10px;
-    padding: 1px 6px;
-  }
-
-  .mini-button {
-    min-height: 34px;
-    min-width: 44px;
-    padding: 4px 7px;
-    border-radius: 8px;
+  .calendar-head { margin-bottom: 3px; }
+  .calendar-head div {
+    padding: 4px 0;
+    border-radius: 6px;
     font-size: 11px;
   }
 
+  .calendar-day {
+    min-height: 128px;
+    padding: 3px;
+    border-width: 1px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .day-number {
+    margin: 0 0 3px;
+    padding: 3px;
+    border-radius: 6px;
+  }
+
+  .day-number strong {
+    min-width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+
+  .day-number span { font-size: 10px; }
+  .rest-note { padding: 5px 2px; font-size: 10px; border-radius: 7px; }
+  .shift-stack { gap: 3px; }
+
+  .shift-pill {
+    padding: 3px;
+    border-left-width: 3px;
+    border-radius: 7px;
+  }
+
+  .shift-pill-main { display: grid; gap: 1px; }
+  .shift-pill-main strong {
+    font-size: 9.5px;
+    text-align: left;
+    line-height: 1.2;
+  }
+  .shift-code { font-size: 8.5px; }
+  .shift-time { font-size: 8.5px; line-height: 1.2; }
+  .shift-people { display: none; }
+  .shift-pill.a-point .shift-pill-main strong::before { content: 'A｜'; }
+
   .release-box {
-    margin-top: 5px;
-    padding: 5px;
+    margin-top: 3px;
+    padding: 3px;
+    font-size: 8.5px;
+    line-height: 1.2;
+    border-radius: 6px;
   }
+  .release-box span { display: none; }
 
-  .claim-button {
-    min-height: 34px;
+  .shift-action-row {
+    display: grid;
+    gap: 2px;
+    margin-top: 3px;
   }
+  .mini-badge { font-size: 8.5px; padding: 0 4px; justify-content: center; }
+  .mini-button {
+    min-height: 26px;
+    min-width: 0;
+    padding: 2px 3px;
+    border-radius: 6px;
+    font-size: 9px;
+  }
+  .claim-button { min-height: 26px; }
 
-  .admin-panel table {
-    min-width: 620px;
-  }
+  .admin-panel table { min-width: 620px; }
 }
