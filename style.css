@@ -312,6 +312,37 @@ button.danger { background: var(--danger); }
   color: #7c2d12;
 }
 
+.shift-pill.released {
+  outline: 3px solid #facc15;
+  background: #fffbeb;
+}
+
+.release-box {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid #f59e0b;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.release-box.compact {
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.release-box span {
+  font-weight: 600;
+}
+
+.claim-button {
+  margin-top: 7px;
+  width: 100%;
+  background: #92400e;
+}
+
 .shift-pill.full { background: var(--danger-bg); border-color: #fecaca; border-left-color: var(--danger); }
 .shift-pill.selected { background: var(--ok-bg); border-color: #99f6e4; border-left-color: var(--ok); }
 .shift-pill.selected.a-point { background: #dcfce7; border-color: #86efac; border-left-color: var(--ok); }
