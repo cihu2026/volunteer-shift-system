@@ -329,18 +329,21 @@ function renderShiftCalendar() {
     const shiftHtml = dayShifts.length
       ? dayShifts.map((shift) => renderShiftInCalendar(shift, selectedShiftIds, releaseMap)).join('')
       : `<div class="rest-note">${isTuesday ? '休園｜不排老師' : '尚未開放'}</div>`;
+    const dayTag = dayShifts.length ? `${dayShifts.length}班` : (isTuesday ? '休園' : '');
 
     cells.push(`
-      <div class="calendar-day ${isTuesday ? 'rest-day' : ''}">
-        <div class="day-number"><strong>${day}</strong><span>${weekday}</span></div>
+      <div class="calendar-day ${isTuesday ? 'rest-day' : ''} ${dayShifts.length ? 'has-shifts' : ''}">
+        <button class="day-number day-toggle" type="button" onclick="toggleCalendarDay(this)" aria-expanded="false">
+          <strong>${day}</strong><span>${weekday}</span><em>${escapeHtml(dayTag)}</em>
+        </button>
         <div class="shift-stack">${shiftHtml}</div>
       </div>
     `);
   }
 
   const loginHint = state.teacherKey
-    ? `目前以「${escapeHtml(state.teacherKey)}」選班。看到想要的班，直接按「選」；看到「釋出中」可以按「我要認領」。`
-    : '先在上方輸入學號或姓名；輸入後月曆裡會出現「選」或「我要認領」按鈕。';
+    ? `目前以「${escapeHtml(state.teacherKey)}」選班。手機請點日期展開班別；看到「釋出中」可以按「我要認領」。`
+    : '先在上方輸入學號或姓名；手機請點日期展開班別。';
 
   target.innerHTML = `
     <div class="month-toolbar">
@@ -357,6 +360,23 @@ function renderShiftCalendar() {
       <div class="calendar-grid">${cells.join('')}</div>
     </div>
   `;
+}
+
+function toggleCalendarDay(button) {
+  const day = button.closest('.calendar-day');
+  if (!day || !day.classList.contains('has-shifts')) return;
+  const wrap = day.closest('.calendar-wrap');
+  if (wrap) {
+    wrap.querySelectorAll('.calendar-day.expanded').forEach((item) => {
+      if (item !== day) {
+        item.classList.remove('expanded');
+        const toggle = item.querySelector('.day-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+  const expanded = day.classList.toggle('expanded');
+  button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 }
 
 function renderShiftInCalendar(shift, selectedShiftIds, releaseMap) {
