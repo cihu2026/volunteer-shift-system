@@ -1,0 +1,37 @@
+@media (max-width: 720px) {
+  .calendar-wrap {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    overscroll-behavior-x: contain;
+    padding-bottom: 14px !important;
+  }
+
+  .calendar-grid,
+  .calendar-head {
+    width: max-content !important;
+    min-width: 760px !important;
+    max-width: none !important;
+    grid-template-columns: repeat(7, minmax(104px, 104px)) !important;
+    gap: 4px !important;
+  }
+
+  .calendar-day {
+    min-width: 104px !important;
+  }
+
+  .calendar-day.expanded {
+    grid-column: 1 / -1 !important;
+    min-width: 100% !important;
+  }
+
+  .calendar-wrap::after {
+    content: '左右滑動看完整星期；點日期展開班別';
+    display: block;
+    margin-top: 6px;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+  }
+}
