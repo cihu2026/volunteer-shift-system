@@ -1,0 +1,137 @@
+.calendar-day.expanded-day {
+  min-height: auto !important;
+}
+
+.calendar-day.expanded-day .shift-stack {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+.calendar-day.expanded-day .shift-pill {
+  display: grid !important;
+  grid-template-columns: minmax(86px, 1.1fr) minmax(96px, 1.3fr) minmax(90px, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+.calendar-day.expanded-day .shift-pill-main,
+.calendar-day.expanded-day .shift-time,
+.calendar-day.expanded-day .shift-people,
+.calendar-day.expanded-day .shift-action-row {
+  min-width: 0 !important;
+}
+
+.calendar-day.expanded-day .shift-pill-main strong {
+  display: block !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+.calendar-day.expanded-day .shift-code {
+  display: block !important;
+  font-size: 11px !important;
+  opacity: .75 !important;
+  margin-top: 2px !important;
+}
+
+.calendar-day.expanded-day .shift-time,
+.calendar-day.expanded-day .shift-people {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  word-break: break-word !important;
+}
+
+.calendar-day.expanded-day .shift-action-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+
+.calendar-day.expanded-day .mini-badge {
+  min-width: 44px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.calendar-day.expanded-day .mini-button {
+  min-width: 54px !important;
+  min-height: 34px !important;
+  padding: 6px 10px !important;
+  white-space: nowrap !important;
+}
+
+.calendar-day.expanded-day .release-box {
+  grid-column: 1 / -1 !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 720px) {
+  .calendar-day.expanded-day {
+    grid-column: 1 / -1 !important;
+    padding: 6px !important;
+  }
+
+  .calendar-day.expanded-day .shift-stack {
+    gap: 5px !important;
+  }
+
+  .calendar-day.expanded-day .shift-pill {
+    grid-template-columns: 44px 1fr auto !important;
+    grid-template-areas:
+      "title time action"
+      "people people action" !important;
+    gap: 4px 6px !important;
+    padding: 7px !important;
+  }
+
+  .calendar-day.expanded-day .shift-pill-main {
+    grid-area: title !important;
+  }
+
+  .calendar-day.expanded-day .shift-time {
+    grid-area: time !important;
+    font-size: 10.5px !important;
+  }
+
+  .calendar-day.expanded-day .shift-people {
+    grid-area: people !important;
+    font-size: 10.5px !important;
+  }
+
+  .calendar-day.expanded-day .shift-action-row {
+    grid-area: action !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 3px !important;
+  }
+
+  .calendar-day.expanded-day .shift-pill-main strong {
+    font-size: 12px !important;
+  }
+
+  .calendar-day.expanded-day .shift-code {
+    display: none !important;
+  }
+
+  .calendar-day.expanded-day .mini-badge {
+    min-width: 44px !important;
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+  }
+
+  .calendar-day.expanded-day .mini-button {
+    min-width: 44px !important;
+    min-height: 30px !important;
+    padding: 4px 6px !important;
+    font-size: 12px !important;
+  }
+}
