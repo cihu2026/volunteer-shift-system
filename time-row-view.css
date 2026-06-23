@@ -1,0 +1,136 @@
+.time-row-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.time-row-card {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.time-row-card.status-full {
+  background: #dcfce7;
+  border-color: #22c55e;
+}
+
+.time-row-card.status-almost {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.time-row-card.status-short {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.time-row-card.a-point {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
+
+.time-row-card.released {
+  background: #fef9c3;
+  border-color: #eab308;
+  outline: 2px solid #facc15;
+}
+
+.time-row-card.selected {
+  box-shadow: 0 0 0 3px #22c55e inset;
+}
+
+.time-row-time {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+  font-weight: 900;
+  color: #334155;
+}
+
+.time-row-time strong {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.time-row-time span {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.time-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.time-row-title {
+  font-weight: 900;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.time-row-sub {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.time-row-people {
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.25;
+}
+
+.time-row-actions {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+}
+
+.time-row-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  background: #e2e8f0;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.time-row-card.status-full .time-row-status { background: #16a34a; color: #fff; }
+.time-row-card.status-almost .time-row-status { background: #f59e0b; color: #fff; }
+.time-row-card.status-short .time-row-status { background: #dc2626; color: #fff; }
+.time-row-card.released .time-row-status { background: #eab308; color: #fff; }
+
+@media (max-width: 720px) {
+  .calendar-day.expanded .time-row-stack {
+    gap: 6px !important;
+    margin-top: 6px !important;
+  }
+
+  .time-row-card {
+    grid-template-columns: 58px 1fr auto;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 10px;
+  }
+
+  .time-row-time strong { font-size: 11px; }
+  .time-row-time span { font-size: 9px; }
+  .time-row-title { font-size: 13px; }
+  .time-row-sub,
+  .time-row-people { font-size: 10.5px; }
+  .time-row-status { min-width: 42px; font-size: 10px; padding: 2px 5px; }
+  .time-row-actions .mini-button { min-height: 26px; font-size: 10px; padding: 3px 6px; }
+}
