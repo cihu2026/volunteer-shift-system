@@ -6,13 +6,19 @@
     background: #e2e8f0 !important;
   }
 
-  .calendar-head {
+  .calendar-head,
+  .calendar-grid {
     display: grid !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
     grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-    gap: 4px !important;
+    column-gap: 4px !important;
+    row-gap: 4px !important;
+    align-items: stretch !important;
+  }
+
+  .calendar-head {
     margin: 0 0 4px 0 !important;
   }
 
@@ -21,19 +27,12 @@
     align-items: center !important;
     justify-content: center !important;
     height: 28px !important;
+    width: 100% !important;
     padding: 0 !important;
     font-size: 12px !important;
+    line-height: 1 !important;
     border-radius: 7px !important;
     text-align: center !important;
-  }
-
-  .calendar-grid {
-    display: grid !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-    gap: 4px !important;
   }
 
   .calendar-day,
@@ -59,14 +58,15 @@
 
   button.day-number {
     width: 100% !important;
-    min-height: 44px !important;
+    height: 46px !important;
+    min-height: 46px !important;
     padding: 3px !important;
     display: grid !important;
     grid-template-columns: 1fr !important;
-    grid-template-rows: auto auto auto !important;
+    grid-template-rows: 22px 11px 11px !important;
     justify-items: center !important;
     align-items: center !important;
-    gap: 1px !important;
+    gap: 0 !important;
     border-radius: 7px !important;
     text-align: center !important;
   }
@@ -76,11 +76,13 @@
     width: 22px !important;
     height: 22px !important;
     font-size: 12px !important;
+    line-height: 22px !important;
     margin: 0 auto !important;
   }
 
   .day-number span {
     font-size: 10px !important;
+    line-height: 1 !important;
     justify-self: center !important;
     margin: 0 !important;
   }
@@ -93,7 +95,7 @@
     margin: 0 auto !important;
     padding: 0 2px !important;
     font-size: 8.5px !important;
-    line-height: 1.2 !important;
+    line-height: 1.15 !important;
     text-align: center !important;
     white-space: nowrap !important;
   }
@@ -115,8 +117,12 @@
     padding: 8px !important;
   }
 
+  .calendar-day:not(.expanded) .rest-note {
+    display: none !important;
+  }
+
   .calendar-wrap::before {
-    content: '手機版：7日欄位已置中；點日期展開當天班別';
+    content: '手機版：維持7日月曆，點日期展開當天班別';
     display: block;
     margin: 2px 0 8px;
     color: #64748b;
