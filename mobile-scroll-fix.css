@@ -1,35 +1,93 @@
 @media (max-width: 720px) {
   .calendar-wrap {
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
     overflow-y: visible !important;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pan-y;
-    overscroll-behavior-x: contain;
-    padding-bottom: 14px !important;
+    padding: 6px !important;
+    background: #e2e8f0 !important;
   }
 
-  .calendar-grid,
   .calendar-head {
-    width: max-content !important;
-    min-width: 760px !important;
-    max-width: none !important;
-    grid-template-columns: repeat(7, minmax(104px, 104px)) !important;
-    gap: 4px !important;
+    display: none !important;
   }
 
-  .calendar-day {
-    min-width: 104px !important;
+  .calendar-grid {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .calendar-day,
+  .calendar-day.empty-day {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 0 6px 0 !important;
+    padding: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .calendar-day.empty-day {
+    display: none !important;
   }
 
   .calendar-day.expanded {
-    grid-column: 1 / -1 !important;
-    min-width: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-column: auto !important;
+    outline: 2px solid #38bdf8 !important;
   }
 
-  .calendar-wrap::after {
-    content: '左右滑動看完整星期；點日期展開班別';
+  button.day-number {
+    min-height: 42px !important;
+    padding: 6px 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .day-number strong {
+    min-width: 26px !important;
+    height: 26px !important;
+    font-size: 14px !important;
+  }
+
+  .day-number span {
+    font-size: 13px !important;
+    margin-right: auto !important;
+  }
+
+  .day-number em {
+    margin-left: auto !important;
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+    white-space: nowrap !important;
+  }
+
+  .calendar-day.has-shifts:not(.expanded) .shift-stack {
+    display: none !important;
+  }
+
+  .calendar-day.expanded .shift-stack {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    margin-top: 6px !important;
+  }
+
+  .calendar-day.expanded .shift-pill {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 8px !important;
+  }
+
+  .calendar-wrap::before {
+    content: '手機版已改為直式日期清單：點日期展開當天班別';
     display: block;
-    margin-top: 6px;
+    margin: 2px 0 8px;
     color: #64748b;
     font-size: 12px;
     text-align: center;
