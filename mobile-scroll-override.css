@@ -101,6 +101,12 @@
     gap: 0 !important;
     border-radius: 6px !important;
     text-align: center !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+
+  .calendar-day.has-shifts {
+    cursor: pointer !important;
   }
 
   .day-number strong {
@@ -135,6 +141,77 @@
     white-space: nowrap !important;
   }
 
+  .calendar-day.day-filled .day-number {
+    background: #dcfce7 !important;
+    border-color: #86efac !important;
+  }
+
+  .calendar-day.day-filled .day-number em {
+    background: #16a34a !important;
+    color: #fff !important;
+  }
+
+  .calendar-day.day-missing-low .day-number {
+    background: #fef9c3 !important;
+    border-color: #fde047 !important;
+  }
+
+  .calendar-day.day-missing-low .day-number em {
+    background: #ca8a04 !important;
+    color: #fff !important;
+  }
+
+  .calendar-day.day-missing-medium .day-number {
+    background: #fed7aa !important;
+    border-color: #fb923c !important;
+  }
+
+  .calendar-day.day-missing-medium .day-number em {
+    background: #ea580c !important;
+    color: #fff !important;
+  }
+
+  .calendar-day.day-missing-high .day-number {
+    background: #fecaca !important;
+    border-color: #ef4444 !important;
+  }
+
+  .calendar-day.day-missing-high .day-number em {
+    background: #dc2626 !important;
+    color: #fff !important;
+  }
+
+  .calendar-day.rest-day .day-number {
+    background: #e5e7eb !important;
+    border-color: #cbd5e1 !important;
+    color: #475569 !important;
+  }
+
+  .calendar-day.rest-day .day-number em {
+    background: #64748b !important;
+    color: #fff !important;
+  }
+
+  .shift-pill.shift-filled {
+    background: #f0fdf4 !important;
+    border-color: #86efac !important;
+    border-left-color: #16a34a !important;
+  }
+
+  .shift-pill.shift-missing-low,
+  .shift-pill.shift-missing-medium,
+  .shift-pill.shift-missing-high {
+    background: #fee2e2 !important;
+    border-color: #f87171 !important;
+    border-left-color: #dc2626 !important;
+  }
+
+  .shift-pill.a-point {
+    background: #ffedd5 !important;
+    border-color: #fb923c !important;
+    border-left-color: #c2410c !important;
+  }
+
   .calendar-day.expanded .shift-pill {
     width: 100% !important;
     max-width: 100% !important;
@@ -149,5 +226,6 @@
     color: #64748b;
     font-size: 11px;
     text-align: center;
+    pointer-events: none !important;
   }
 }
