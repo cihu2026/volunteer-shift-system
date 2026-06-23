@@ -3,7 +3,8 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxQj4g1Ee-3TGL7iikQ49cQ
 const state = {
   publicData: null,
   teacherKey: '',
-  teacherResult: null
+  teacherResult: null,
+  expandedDates: new Set()
 };
 
 function showApiStatus(message, type = 'hint') {
@@ -328,14 +329,21 @@ function renderShiftCalendar() {
     const dayShifts = grouped[dateKey] || [];
     const missingCount = dayShifts.reduce((sum, shift) => sum + Number(shift.remaining || 0), 0);
     const restDay = weekday === 2 && dayShifts.length === 0;
+    const hasShifts = dayShifts.length > 0;
+    const expanded = hasShifts && state.expandedDates.has(dateKey);
+    const dayClass = hasShifts ? (expanded ? 'expanded-day' : 'collapsed-day') : '';
+    const hintText = hasShifts ? (expanded ? '｜收合' : '｜點開') : '';
+    const dateHeader = hasShifts
+      ? `<button type="button" class="day-number day-toggle" onclick="toggleDate('${escapeAttr(dateKey)}')" aria-expanded="${expanded ? 'true' : 'false'}">
+          <strong>${day}</strong>
+          <span>週${weekdayNames[weekday]}${missingCount ? `｜缺 ${missingCount}` : ''}${hintText}</span>
+        </button>`
+      : `<div class="day-number"><strong>${day}</strong><span>週${weekdayNames[weekday]}</span></div>`;
 
     cells.push(`
-      <div class="calendar-day ${restDay ? 'rest-day' : ''}">
-        <div class="day-number">
-          <strong>${day}</strong>
-          <span>週${weekdayNames[weekday]}${missingCount ? `｜缺 ${missingCount}` : ''}</span>
-        </div>
-        ${restDay ? '<div class="rest-note">週二休園</div>' : renderDayShifts(dayShifts)}
+      <div class="calendar-day ${restDay ? 'rest-day' : ''} ${dayClass}">
+        ${dateHeader}
+        ${restDay ? '<div class="rest-note">週二休園</div>' : hasShifts ? (expanded ? renderDayShifts(dayShifts) : renderDaySummary(dayShifts, dateKey)) : '<div class="empty">尚無開放班別</div>'}
       </div>
     `);
   }
@@ -344,13 +352,41 @@ function renderShiftCalendar() {
     <div class="month-toolbar">
       <div>
         <h3>${monthInfo.year} 年 ${monthInfo.month} 月</h3>
-        <p class="hint">先輸入學號或姓名，再點月曆上的「選班」。黃色是釋出待認領，綠色是你已選。</p>
+        <p class="hint">預設先折疊成日期摘要；點日期展開當天班別。黃色是釋出待認領，綠色是你已選。</p>
       </div>
-      <span class="badge">共 ${shifts.length} 個班別</span>
+      <div class="month-actions">
+        <span class="badge">共 ${shifts.length} 個班別</span>
+        <button type="button" class="mini-button" onclick="expandAllDates()">全部展開</button>
+        <button type="button" class="mini-button" onclick="collapseAllDates()">全部收合</button>
+      </div>
     </div>
     <div class="calendar-wrap">
       <div class="calendar-grid calendar-head">${weekdayNames.map((day) => `<div>${day}</div>`).join('')}</div>
       <div class="calendar-grid">${cells.join('')}</div>
+    </div>
+  `;
+}
+
+function renderDaySummary(dayShifts, dateKey) {
+  const missingCount = dayShifts.reduce((sum, shift) => sum + Number(shift.remaining || 0), 0);
+  const selectedCount = dayShifts.reduce((sum, shift) => sum + Number(shift.selectedCount || 0), 0);
+  const aPointCount = dayShifts.filter(isAPointShift).length;
+  const releaseCount = dayShifts.filter((shift) => Boolean(findRelease(shift.shiftId))).length;
+  const myCount = dayShifts.filter(isShiftSelectedByCurrentTeacher).length;
+  const chips = [
+    `${dayShifts.length} 班`,
+    `缺 ${missingCount}`,
+    selectedCount ? `已選 ${selectedCount}` : '尚無人選',
+    aPointCount ? `A點 ${aPointCount}` : '',
+    releaseCount ? `釋出 ${releaseCount}` : '',
+    myCount ? `你有 ${myCount} 班` : ''
+  ].filter(Boolean);
+
+  return `
+    <div class="day-summary" role="button" tabindex="0" onclick="toggleDate('${escapeAttr(dateKey)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleDate('${escapeAttr(dateKey)}');}">
+      <div class="summary-line"><strong>${chips[0]}</strong><span>${chips[1] || ''}</span></div>
+      <div class="summary-chips">${chips.slice(2).map((chip) => `<span>${escapeHtml(chip)}</span>`).join('')}</div>
+      <div class="collapse-hint">點日期展開看班別</div>
     </div>
   `;
 }
@@ -452,6 +488,29 @@ function renderReleaseTable(rows) {
       </tbody>
     </table>
   `;
+}
+
+function toggleDate(dateKey) {
+  if (!dateKey) return;
+  if (state.expandedDates.has(dateKey)) {
+    state.expandedDates.delete(dateKey);
+  } else {
+    state.expandedDates.add(dateKey);
+  }
+  renderShiftCalendar();
+}
+
+function expandAllDates() {
+  if (!state.publicData || !state.publicData.shifts) return;
+  state.publicData.shifts.forEach((shift) => {
+    if (shift.date) state.expandedDates.add(shift.date);
+  });
+  renderShiftCalendar();
+}
+
+function collapseAllDates() {
+  state.expandedDates.clear();
+  renderShiftCalendar();
 }
 
 function getInputKey() {
@@ -593,7 +652,97 @@ function escapeAttr(value) {
   return escapeHtml(value).replace(/`/g, '&#96;');
 }
 
+function injectCollapseStyles() {
+  if (document.querySelector('#collapseCalendarStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'collapseCalendarStyles';
+  style.textContent = `
+    .month-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .month-actions .mini-button {
+      background: #475569;
+      color: #fff;
+    }
+    button.day-number.day-toggle {
+      width: 100%;
+      border: 1px solid #bae6fd;
+      background: #e0f2fe;
+      color: #0f172a;
+      text-align: left;
+    }
+    button.day-number.day-toggle:hover { filter: brightness(0.98); }
+    .calendar-day.collapsed-day {
+      min-height: 150px;
+    }
+    .day-summary {
+      display: grid;
+      gap: 7px;
+      padding: 9px;
+      border: 1px dashed #94a3b8;
+      border-radius: 10px;
+      background: #f8fafc;
+      cursor: pointer;
+    }
+    .day-summary:focus {
+      outline: 3px solid #bfdbfe;
+      outline-offset: 2px;
+    }
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .summary-line span { color: #b91c1c; }
+    .summary-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .summary-chips span {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 2px 7px;
+      background: #e5e7eb;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .collapse-hint {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    @media (max-width: 720px) {
+      .month-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+      }
+      .month-actions .badge { grid-column: 1 / -1; justify-content: center; }
+      .month-actions .mini-button { width: 100%; min-height: 32px; font-size: 12px; }
+      button.day-number.day-toggle { min-height: 0; padding: 3px; }
+      .calendar-day.collapsed-day { min-height: 86px; }
+      .day-summary { gap: 3px; padding: 4px; border-radius: 7px; }
+      .summary-line { display: grid; gap: 1px; font-size: 10px; }
+      .summary-chips { gap: 2px; }
+      .summary-chips span { padding: 1px 4px; font-size: 8.5px; }
+      .collapse-hint { font-size: 8.5px; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  injectCollapseStyles();
+
   const refreshBtn = document.querySelector('#refreshBtn');
   const setupBtn = document.querySelector('#setupBackendBtn');
   const importBtn = document.querySelector('#importTeachersBtn');
