@@ -7,14 +7,33 @@
   }
 
   .calendar-head {
-    display: none !important;
-  }
-
-  .calendar-grid {
-    display: block !important;
+    display: grid !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    margin: 0 0 4px 0 !important;
+  }
+
+  .calendar-head div {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 28px !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    border-radius: 7px !important;
+    text-align: center !important;
+  }
+
+  .calendar-grid {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 4px !important;
   }
 
   .calendar-day,
@@ -23,47 +42,59 @@
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    min-height: 0 !important;
-    margin: 0 0 6px 0 !important;
-    padding: 6px !important;
-    border-radius: 10px !important;
-  }
-
-  .calendar-day.empty-day {
-    display: none !important;
+    min-height: 52px !important;
+    margin: 0 !important;
+    padding: 2px !important;
+    border-radius: 8px !important;
   }
 
   .calendar-day.expanded {
+    grid-column: 1 / -1 !important;
     width: 100% !important;
     min-width: 0 !important;
-    grid-column: auto !important;
+    max-width: 100% !important;
+    padding: 6px !important;
     outline: 2px solid #38bdf8 !important;
   }
 
   button.day-number {
-    min-height: 42px !important;
-    padding: 6px 8px !important;
-    display: flex !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 3px !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto auto !important;
+    justify-items: center !important;
     align-items: center !important;
-    gap: 8px !important;
-    border-radius: 8px !important;
+    gap: 1px !important;
+    border-radius: 7px !important;
+    text-align: center !important;
   }
 
   .day-number strong {
-    min-width: 26px !important;
-    height: 26px !important;
-    font-size: 14px !important;
+    min-width: 22px !important;
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 12px !important;
+    margin: 0 auto !important;
   }
 
   .day-number span {
-    font-size: 13px !important;
-    margin-right: auto !important;
+    font-size: 10px !important;
+    justify-self: center !important;
+    margin: 0 !important;
   }
 
   .day-number em {
-    margin-left: auto !important;
-    font-size: 11px !important;
-    padding: 2px 8px !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 48px !important;
+    justify-self: center !important;
+    margin: 0 auto !important;
+    padding: 0 2px !important;
+    font-size: 8.5px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
     white-space: nowrap !important;
   }
 
@@ -85,7 +116,7 @@
   }
 
   .calendar-wrap::before {
-    content: '手機版已改為直式日期清單：點日期展開當天班別';
+    content: '手機版：7日欄位已置中；點日期展開當天班別';
     display: block;
     margin: 2px 0 8px;
     color: #64748b;
