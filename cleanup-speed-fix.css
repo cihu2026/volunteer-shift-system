@@ -1,0 +1,39 @@
+/* 精簡版：隱藏容易誤按、會一次展開大量資料的控制鈕 */
+#setupBackendBtn,
+#importTeachersBtn,
+.month-actions .mini-button {
+  display: none !important;
+}
+
+.month-actions {
+  display: block !important;
+}
+
+.month-actions .badge {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+/* 手機點開日期後，只顯示當天一列一列班別，其他摘要保持最小 */
+@media (max-width: 720px) {
+  .day-summary,
+  .calendar-day:not(.expanded-day) .shift-stack,
+  .calendar-day:not(.expanded-day) .rest-note,
+  .calendar-day:not(.expanded-day) .empty {
+    display: none !important;
+  }
+
+  .calendar-day,
+  .calendar-day.empty-day,
+  .calendar-day.collapsed-day,
+  .calendar-day.rest-day {
+    min-height: 36px !important;
+    height: auto !important;
+    padding: 1px !important;
+  }
+
+  .calendar-day.expanded-day {
+    min-height: auto !important;
+    height: auto !important;
+  }
+}
