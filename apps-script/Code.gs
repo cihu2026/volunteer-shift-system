@@ -5,6 +5,10 @@ const CONFIG = {
     SHIFTS: 'Shifts',
     SELECTIONS: 'Selections',
     SWAPS: 'SwapRequests'
+  },
+  CACHE: {
+    PUBLIC_DATA_KEY: 'volunteerShiftPublicData:v2',
+    TTL_SECONDS: 45
   }
 };
 
@@ -40,7 +44,7 @@ function handleRequest_(e) {
         break;
       case 'getPublicData':
       case 'list':
-        data = getPublicData();
+        data = getPublicData(params.forceRefresh === 'true' || params.noCache === 'true');
         break;
       case 'lookupTeacher':
         data = lookupTeacher(params.query || params.teacherKey || '');
@@ -85,41 +89,13 @@ function handleRequest_(e) {
 }
 
 function setupSystem() {
-  const ss = getSpreadsheet_();
-  const teachersSheet = ensureSheet_(ss, CONFIG.SHEETS.TEACHERS, HEADERS.Teachers);
-  const shiftsSheet = ensureSheet_(ss, CONFIG.SHEETS.SHIFTS, HEADERS.Shifts);
-  ensureSheet_(ss, CONFIG.SHEETS.SELECTIONS, HEADERS.Selections);
-  ensureSheet_(ss, CONFIG.SHEETS.SWAPS, HEADERS.SwapRequests);
-
-  if (teachersSheet.getLastRow() <= 1) {
-    teachersSheet.getRange(2, 1, 3, HEADERS.Teachers.length).setValues([
-      ['T001', '王老師', true, '', '', '示範資料'],
-      ['T002', '陳老師', true, '', '', '示範資料'],
-      ['T003', '林老師', true, '', '', '示範資料']
-    ]);
-  }
-
-  if (shiftsSheet.getLastRow() <= 1) {
-    shiftsSheet.getRange(2, 1, 8, HEADERS.Shifts.length).setValues([
-      ['S001', '2026/07/05', '日', 'A點', 'A點上午班', '09:00', '13:00', '08:50', 1, 'open', ''],
-      ['S002', '2026/07/05', '日', 'A點', 'A點下午班', '12:00', '16:00', '11:50', 1, 'open', ''],
-      ['S003', '2026/07/05', '日', '慈湖遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
-      ['S004', '2026/07/05', '日', '慈湖遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
-      ['S005', '2026/07/05', '日', '北橫遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
-      ['S006', '2026/07/05', '日', '北橫遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
-      ['S007', '2026/07/06', '一', '導覽', '導覽第1梯', '08:45', '09:15', '08:35', 1, 'open', ''],
-      ['S008', '2026/07/06', '一', '導覽', '導覽第3梯', '09:45', '10:15', '09:35', 1, 'open', '']
-    ]);
-  }
-
-  formatSystemSheets_();
+  const ss = ensureSystem_(true);
+  invalidatePublicCache_();
   return { message: 'setup completed', spreadsheetUrl: ss.getUrl() };
 }
 
 function importTeachersFromWorkbook() {
-  setupSystem();
-
-  const ss = getSpreadsheet_();
+  const ss = ensureSystem_(false);
   const target = ss.getSheetByName(CONFIG.SHEETS.TEACHERS);
   const existing = tableToObjects_(target);
   const existingIds = new Set(existing.map((row) => String(row.teacherId)));
@@ -151,15 +127,25 @@ function importTeachersFromWorkbook() {
 
   if (newRows.length > 0) {
     target.getRange(target.getLastRow() + 1, 1, newRows.length, HEADERS.Teachers.length).setValues(newRows);
+    invalidatePublicCache_();
   }
 
   return { imported: newRows.length, totalTeachers: tableToObjects_(target).length };
 }
 
-function getPublicData() {
-  setupSystem();
+function getPublicData(forceRefresh) {
+  if (!forceRefresh) {
+    const cached = readPublicCache_();
+    if (cached) return cached;
+  }
 
-  const ss = getSpreadsheet_();
+  const data = buildPublicData_();
+  writePublicCache_(data);
+  return data;
+}
+
+function buildPublicData_() {
+  const ss = ensureSystem_(false);
   const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS))
     .filter((row) => String(row.active).toLowerCase() !== 'false');
   const shifts = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS))
@@ -196,10 +182,10 @@ function getPublicData() {
 }
 
 function lookupTeacher(query) {
-  const teacher = findTeacher_(query);
+  const ss = ensureSystem_(false);
+  const teacher = findTeacher_(query, ss);
   if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-  const ss = getSpreadsheet_();
   const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS))
     .filter((row) => String(row.teacherId) === String(teacher.teacherId));
   const shifts = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SHIFTS));
@@ -222,9 +208,8 @@ function selectShift(teacherKey, shiftId) {
   lock.waitLock(8000);
 
   try {
-    setupSystem();
-    const ss = getSpreadsheet_();
-    const teacher = findTeacher_(teacherKey);
+    const ss = ensureSystem_(false);
+    const teacher = findTeacher_(teacherKey, ss);
     if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
     const shiftsSheet = ss.getSheetByName(CONFIG.SHEETS.SHIFTS);
@@ -255,6 +240,7 @@ function selectShift(teacherKey, shiftId) {
       ''
     ]);
 
+    invalidatePublicCache_();
     return {
       selectionId,
       teacherId: teacher.teacherId,
@@ -270,12 +256,12 @@ function selectShift(teacherKey, shiftId) {
 function confirmShift(teacherKey, shiftId, selectionId) {
   if (!teacherKey && !selectionId) throw new Error('請輸入學號／姓名，或提供 selectionId。');
 
-  const ss = getSpreadsheet_();
+  const ss = ensureSystem_(false);
   const sheet = ss.getSheetByName(CONFIG.SHEETS.SELECTIONS);
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
   const index = headerIndex_(headers);
-  const teacher = teacherKey ? findTeacher_(teacherKey) : null;
+  const teacher = teacherKey ? findTeacher_(teacherKey, ss) : null;
 
   for (let r = 1; r < values.length; r++) {
     const row = values[r];
@@ -285,6 +271,7 @@ function confirmShift(teacherKey, shiftId, selectionId) {
     if (matchedBySelectionId || matchedByTeacherAndShift) {
       sheet.getRange(r + 1, index.confirmed + 1).setValue(true);
       sheet.getRange(r + 1, index.confirmedAt + 1).setValue(new Date());
+      invalidatePublicCache_();
       return { message: '已確認收到提醒。' };
     }
   }
@@ -296,11 +283,10 @@ function requestSwap(teacherKey, originalShiftId, desiredShiftId, note) {
   if (!teacherKey) throw new Error('請輸入學號或姓名。');
   if (!originalShiftId) throw new Error('請選擇原本的班。');
 
-  setupSystem();
-  const teacher = findTeacher_(teacherKey);
+  const ss = ensureSystem_(false);
+  const teacher = findTeacher_(teacherKey, ss);
   if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
-  const ss = getSpreadsheet_();
   const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
   const hasOriginal = selections.some((row) => String(row.teacherId) === String(teacher.teacherId) && String(row.shiftId) === String(originalShiftId));
   if (!hasOriginal) throw new Error('你沒有選這個原班別，不能申請換班。');
@@ -317,6 +303,7 @@ function requestSwap(teacherKey, originalShiftId, desiredShiftId, note) {
     new Date()
   ]);
 
+  invalidatePublicCache_();
   return { requestId, message: '已建立換班申請。' };
 }
 
@@ -328,9 +315,8 @@ function releaseShift(teacherKey, shiftId, note) {
   lock.waitLock(8000);
 
   try {
-    setupSystem();
-    const ss = getSpreadsheet_();
-    const teacher = findTeacher_(teacherKey);
+    const ss = ensureSystem_(false);
+    const teacher = findTeacher_(teacherKey, ss);
     if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
     const selections = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.SELECTIONS));
@@ -358,6 +344,7 @@ function releaseShift(teacherKey, shiftId, note) {
       new Date()
     ]);
 
+    invalidatePublicCache_();
     return { requestId, shiftId, message: '已釋出，等待其他老師認領。' };
   } finally {
     lock.releaseLock();
@@ -372,9 +359,8 @@ function cancelRelease(teacherKey, shiftId) {
   lock.waitLock(8000);
 
   try {
-    setupSystem();
-    const ss = getSpreadsheet_();
-    const teacher = findTeacher_(teacherKey);
+    const ss = ensureSystem_(false);
+    const teacher = findTeacher_(teacherKey, ss);
     if (!teacher) throw new Error('查無此人，請確認學號或姓名。');
 
     const swapSheet = ss.getSheetByName(CONFIG.SHEETS.SWAPS);
@@ -383,6 +369,7 @@ function cancelRelease(teacherKey, shiftId) {
 
     swapSheet.getRange(rowInfo.rowNumber, rowInfo.index.status + 1).setValue('cancelled');
     swapSheet.getRange(rowInfo.rowNumber, rowInfo.index.note + 1).setValue((rowInfo.row[rowInfo.index.note] || '') + '｜取消釋出');
+    invalidatePublicCache_();
     return { shiftId, message: '已取消釋出。' };
   } finally {
     lock.releaseLock();
@@ -397,9 +384,8 @@ function claimReleasedShift(teacherKey, shiftId) {
   lock.waitLock(8000);
 
   try {
-    setupSystem();
-    const ss = getSpreadsheet_();
-    const claimant = findTeacher_(teacherKey);
+    const ss = ensureSystem_(false);
+    const claimant = findTeacher_(teacherKey, ss);
     if (!claimant) throw new Error('查無此人，請確認學號或姓名。');
 
     const swapSheet = ss.getSheetByName(CONFIG.SHEETS.SWAPS);
@@ -441,6 +427,7 @@ function claimReleasedShift(teacherKey, shiftId) {
     swapSheet.getRange(releaseInfo.rowNumber, releaseInfo.index.status + 1).setValue('completed');
     swapSheet.getRange(releaseInfo.rowNumber, releaseInfo.index.note + 1).setValue((releaseInfo.row[releaseInfo.index.note] || '') + '｜由 ' + claimant.name + ' 認領');
 
+    invalidatePublicCache_();
     return { shiftId, teacherId: claimant.teacherId, teacherName: claimant.name, message: '認領成功，請記得按「我知道了」。' };
   } finally {
     lock.releaseLock();
@@ -470,13 +457,12 @@ function isReleaseRequest_(row) {
   return String(row.desiredShiftId || '') === 'RELEASE' || String(row.requestId || '').startsWith('REL-');
 }
 
-function findTeacher_(query) {
-  setupSystem();
+function findTeacher_(query, ss) {
   const value = normalizeText_(query);
   if (!value) return null;
 
-  const ss = getSpreadsheet_();
-  const teachers = tableToObjects_(ss.getSheetByName(CONFIG.SHEETS.TEACHERS));
+  const spreadsheet = ss || ensureSystem_(false);
+  const teachers = tableToObjects_(spreadsheet.getSheetByName(CONFIG.SHEETS.TEACHERS));
   return teachers.find((row) => {
     const active = String(row.active).toLowerCase() !== 'false';
     return active && (String(row.teacherId) === value || normalizeText_(row.name) === value);
@@ -486,6 +472,38 @@ function findTeacher_(query) {
 function getSpreadsheet_() {
   if (CONFIG.SPREADSHEET_ID) return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
   return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function ensureSystem_(withFormat) {
+  const ss = getSpreadsheet_();
+  const teachersSheet = ensureSheet_(ss, CONFIG.SHEETS.TEACHERS, HEADERS.Teachers);
+  const shiftsSheet = ensureSheet_(ss, CONFIG.SHEETS.SHIFTS, HEADERS.Shifts);
+  ensureSheet_(ss, CONFIG.SHEETS.SELECTIONS, HEADERS.Selections);
+  ensureSheet_(ss, CONFIG.SHEETS.SWAPS, HEADERS.SwapRequests);
+
+  if (teachersSheet.getLastRow() <= 1) {
+    teachersSheet.getRange(2, 1, 3, HEADERS.Teachers.length).setValues([
+      ['T001', '王老師', true, '', '', '示範資料'],
+      ['T002', '陳老師', true, '', '', '示範資料'],
+      ['T003', '林老師', true, '', '', '示範資料']
+    ]);
+  }
+
+  if (shiftsSheet.getLastRow() <= 1) {
+    shiftsSheet.getRange(2, 1, 8, HEADERS.Shifts.length).setValues([
+      ['S001', '2026/07/05', '日', 'A點', 'A點上午班', '09:00', '13:00', '08:50', 1, 'open', ''],
+      ['S002', '2026/07/05', '日', 'A點', 'A點下午班', '12:00', '16:00', '11:50', 1, 'open', ''],
+      ['S003', '2026/07/05', '日', '慈湖遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
+      ['S004', '2026/07/05', '日', '慈湖遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
+      ['S005', '2026/07/05', '日', '北橫遊客中心', '上午-1', '08:30', '12:30', '08:20', 1, 'open', ''],
+      ['S006', '2026/07/05', '日', '北橫遊客中心', '下午-1', '12:30', '16:30', '12:20', 1, 'open', ''],
+      ['S007', '2026/07/06', '一', '導覽', '導覽第1梯', '08:45', '09:15', '08:35', 1, 'open', ''],
+      ['S008', '2026/07/06', '一', '導覽', '導覽第3梯', '09:45', '10:15', '09:35', 1, 'open', '']
+    ]);
+  }
+
+  if (withFormat) formatSystemSheets_(ss);
+  return ss;
 }
 
 function ensureSheet_(ss, sheetName, headers) {
@@ -502,10 +520,10 @@ function ensureSheet_(ss, sheetName, headers) {
   return sheet;
 }
 
-function formatSystemSheets_() {
-  const ss = getSpreadsheet_();
+function formatSystemSheets_(ss) {
+  const spreadsheet = ss || getSpreadsheet_();
   Object.values(CONFIG.SHEETS).forEach((sheetName) => {
-    const sheet = ss.getSheetByName(sheetName);
+    const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) return;
     const lastCol = Math.max(sheet.getLastColumn(), 1);
     sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold').setBackground('#e5e7eb');
@@ -549,6 +567,35 @@ function tableToObjects_(sheet) {
     });
     return obj;
   });
+}
+
+function readPublicCache_() {
+  try {
+    const cached = CacheService.getScriptCache().get(CONFIG.CACHE.PUBLIC_DATA_KEY);
+    return cached ? JSON.parse(cached) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writePublicCache_(data) {
+  try {
+    CacheService.getScriptCache().put(
+      CONFIG.CACHE.PUBLIC_DATA_KEY,
+      JSON.stringify(data),
+      CONFIG.CACHE.TTL_SECONDS
+    );
+  } catch (error) {
+    // 資料量太大或快取暫時不可用時，不影響正常讀取。
+  }
+}
+
+function invalidatePublicCache_() {
+  try {
+    CacheService.getScriptCache().remove(CONFIG.CACHE.PUBLIC_DATA_KEY);
+  } catch (error) {
+    // 快取清除失敗不阻斷主流程。
+  }
 }
 
 function headerIndex_(headers) {
