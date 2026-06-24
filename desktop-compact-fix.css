@@ -1,0 +1,58 @@
+/* v56：電腦版不要被手機小月曆影響，並縮短上方高度 */
+@media (min-width: 721px) {
+  .hero {
+    padding: 20px 24px !important;
+  }
+
+  .hero h1 {
+    font-size: 34px !important;
+    line-height: 1.15 !important;
+    margin: 4px 0 6px !important;
+  }
+
+  .subtitle {
+    max-width: none !important;
+  }
+
+  .layout {
+    width: min(1280px, calc(100% - 64px)) !important;
+    margin: 16px auto 28px !important;
+    gap: 12px !important;
+  }
+
+  .panel {
+    padding: 14px 16px !important;
+  }
+
+  .calendar-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+  }
+
+  .calendar-head,
+  .calendar-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(132px, 1fr)) !important;
+    min-width: 980px !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .calendar-day,
+  .calendar-day.empty-day,
+  .calendar-day.collapsed-day,
+  .calendar-day.rest-day {
+    min-height: 112px !important;
+    padding: 7px !important;
+  }
+
+  .calendar-day:not(.expanded-day) .day-summary {
+    display: block !important;
+  }
+
+  .calendar-day.expanded-day {
+    grid-column: 1 / -1 !important;
+  }
+}
