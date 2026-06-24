@@ -1,4 +1,4 @@
-/* 穩定月曆排版：手機維持 7 欄小月曆，修正右側空白、格子歪斜與文字爆版 */
+/* 穩定月曆排版：桌機保留寬版可橫向捲動；手機維持 7 欄小月曆 */
 :root {
   --full-bg: #dcfce7;
   --full-border: #22c55e;
@@ -15,52 +15,32 @@
   --navy: #1f2937;
 }
 
-html,
-body {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-body {
-  -webkit-text-size-adjust: 100%;
-}
-
-.hero,
-header.hero {
-  display: block;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  box-sizing: border-box;
-}
+body { -webkit-text-size-adjust: 100%; }
 
 #setupBackendBtn,
 #importTeachersBtn,
-.month-actions .mini-button {
-  display: none !important;
-}
+.month-actions .mini-button { display: none !important; }
 
 .month-actions .badge {
   width: 100%;
   justify-content: center;
 }
 
+/* 桌機：恢復寬版月曆，不壓縮，不切掉 */
 .calendar-wrap {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
   box-sizing: border-box;
 }
 
 .calendar-head,
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  width: 100%;
-  min-width: 980px;
+  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  gap: 7px;
+  min-width: 1080px;
   align-items: stretch;
 }
 
@@ -75,10 +55,6 @@ header.hero {
 
 .calendar-day,
 .calendar-day.empty-day {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  margin: 0;
   box-sizing: border-box;
 }
 
@@ -142,9 +118,7 @@ header.hero {
   border-color: #eab308 !important;
 }
 
-.shift-pill.selected {
-  outline: 3px solid #22c55e;
-}
+.shift-pill.selected { outline: 3px solid #22c55e; }
 
 .shift-pill.a-point {
   background: #ffedd5 !important;
@@ -176,9 +150,7 @@ header.hero {
   border-radius: 10px;
 }
 
-.calendar-day.expanded-day .release-box {
-  grid-column: 1 / -1;
-}
+.calendar-day.expanded-day .release-box { grid-column: 1 / -1; }
 
 .calendar-day.expanded-day .shift-action-row {
   display: flex;
@@ -189,6 +161,13 @@ header.hero {
 }
 
 @media (max-width: 720px) {
+  html,
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
   .hero,
   header.hero {
     width: 100% !important;
@@ -196,9 +175,6 @@ header.hero {
     max-width: 100% !important;
     margin: 0 !important;
     border-radius: 0 !important;
-  }
-
-  .hero {
     padding: 18px 14px !important;
   }
 
@@ -224,9 +200,7 @@ header.hero {
     border-radius: 14px !important;
   }
 
-  .notice {
-    border-radius: 14px !important;
-  }
+  .notice { border-radius: 14px !important; }
 
   .search-row,
   .section-title-row,
@@ -267,9 +241,7 @@ header.hero {
     align-items: stretch !important;
   }
 
-  .calendar-head {
-    margin-bottom: 4px !important;
-  }
+  .calendar-head { margin-bottom: 4px !important; }
 
   .calendar-head div {
     height: 25px !important;
@@ -341,9 +313,7 @@ header.hero {
   }
 
   .day-number .weekday-text,
-  .day-number > span {
-    display: none !important;
-  }
+  .day-number > span { display: none !important; }
 
   .day-number .status-chip {
     display: inline-flex !important;
@@ -423,9 +393,7 @@ header.hero {
     line-height: 1.2 !important;
   }
 
-  .calendar-day.expanded-day .shift-code {
-    display: none !important;
-  }
+  .calendar-day.expanded-day .shift-code { display: none !important; }
 
   .calendar-day.expanded-day .shift-time,
   .calendar-day.expanded-day .shift-people {
@@ -465,11 +433,6 @@ header.hero {
     line-height: 1.35 !important;
   }
 
-  .admin-panel {
-    overflow-x: auto !important;
-  }
-
-  .admin-panel table {
-    min-width: 620px !important;
-  }
+  .admin-panel { overflow-x: auto !important; }
+  .admin-panel table { min-width: 620px !important; }
 }
