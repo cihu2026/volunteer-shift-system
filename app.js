@@ -4,7 +4,8 @@ const state = {
   publicData: null,
   teacherKey: '',
   teacherResult: null,
-  expandedDates: new Set()
+  expandedDates: new Set(),
+  renderTimer: null
 };
 
 function showApiStatus(message, type = 'hint') {
@@ -62,20 +63,26 @@ function apiGet(params) {
   });
 }
 
-async function loadPublicData() {
-  showApiStatus('正在載入 8 月線上排班月曆...', 'hint');
-  renderMessage('#shiftList', '載入月曆中...');
-  renderMessage('#adminPanel', '載入公開檢查資料中...');
+async function loadPublicData(options = {}) {
+  const quiet = options.quiet === true;
+  const forceRefresh = options.forceRefresh === true;
+  if (!quiet) {
+    showApiStatus('正在載入 8 月線上排班月曆...', 'hint');
+    renderMessage('#shiftList', '載入月曆中...');
+    renderMessage('#adminPanel', '載入公開檢查資料中...');
+  }
   try {
-    const data = await apiGet({ action: 'getPublicData' });
+    const data = await apiGet({ action: 'getPublicData', noCache: forceRefresh ? 'true' : '' });
     state.publicData = normalizePublicData(data);
     renderShiftCalendar();
     renderAdminPanel();
     showApiStatus('後端連線正常，已載入 8 月線上排班。資料時間：' + formatDateTime(data.generatedAt), 'success-text');
+    return state.publicData;
   } catch (error) {
     showApiStatus('連線失敗：' + error.message, 'danger-text');
     renderMessage('#shiftList', error.message);
     renderMessage('#adminPanel', '請先確認 Apps Script 已部署，且存取權是「任何人」。');
+    throw error;
   }
 }
 
@@ -85,9 +92,21 @@ function normalizePublicData(data) {
     ...shift,
     date: normalizeDateKey(shift.date)
   })).filter((shift) => Boolean(shift.date));
+  normalized.sortedShifts = normalized.shifts.slice().sort(compareShift);
+  normalized.shiftsByDate = groupBy(normalized.sortedShifts, (shift) => shift.date);
+  normalized.shiftById = Object.create(null);
+  normalized.sortedShifts.forEach((shift) => {
+    if (shift.shiftId) normalized.shiftById[String(shift.shiftId)] = shift;
+  });
   normalized.selections = (data && data.selections) || [];
   normalized.swaps = (data && data.swaps) || [];
   normalized.releases = (data && data.releases) || normalized.swaps.filter(isReleaseRequest);
+  normalized.releaseByShiftId = Object.create(null);
+  normalized.releases.forEach((row) => {
+    if (String(row.status || 'open') === 'open' && row.originalShiftId) {
+      normalized.releaseByShiftId[String(row.originalShiftId)] = row;
+    }
+  });
   normalized.teachers = (data && data.teachers) || [];
   return normalized;
 }
@@ -102,22 +121,31 @@ function normalizeDateKey(value) {
 function useTypedTeacherKey() {
   const input = document.querySelector('#queryInput');
   state.teacherKey = input ? input.value.trim() : '';
-  if (state.publicData) renderShiftCalendar();
+  if (state.publicData) scheduleRenderShiftCalendar();
 }
 
-async function queryMySchedule() {
+function scheduleRenderShiftCalendar() {
+  if (state.renderTimer) window.clearTimeout(state.renderTimer);
+  state.renderTimer = window.setTimeout(() => {
+    state.renderTimer = null;
+    renderShiftCalendar();
+  }, 180);
+}
+
+async function queryMySchedule(options = {}) {
+  const refreshPublic = options.refreshPublic === true;
   const input = document.querySelector('#queryInput');
   const key = input ? input.value.trim() : '';
   if (!key) {
     state.teacherKey = '';
     state.teacherResult = null;
     renderMessage('#mySchedule', '請先輸入學號或姓名。');
-    renderShiftCalendar();
+    scheduleRenderShiftCalendar();
     return;
   }
 
   state.teacherKey = key;
-  renderShiftCalendar();
+  scheduleRenderShiftCalendar();
   renderMessage('#mySchedule', '查詢中...');
 
   try {
@@ -130,11 +158,17 @@ async function queryMySchedule() {
     }
     state.teacherResult = data;
     renderMySchedule();
-    await loadPublicData();
+
+    if (refreshPublic) {
+      await loadPublicData({ quiet: true, forceRefresh: true });
+      renderMySchedule();
+    } else {
+      renderShiftCalendar();
+    }
   } catch (error) {
     state.teacherResult = null;
     renderMessage('#mySchedule', error.message + '（可以先確認是否已按「從原表匯入學號姓名」。）');
-    renderShiftCalendar();
+    scheduleRenderShiftCalendar();
   }
 }
 
@@ -148,10 +182,10 @@ async function selectShift(shiftId) {
   try {
     const result = await apiGet({ action: 'selectShift', teacherKey: key, shiftId });
     alert(result.message || '選班成功。');
-    await queryMySchedule();
+    await queryMySchedule({ refreshPublic: true });
   } catch (error) {
     alert(error.message);
-    await loadPublicData();
+    await loadPublicData({ forceRefresh: true });
   }
 }
 
@@ -164,7 +198,7 @@ async function confirmSelection(selectionId, shiftId) {
   try {
     const result = await apiGet({ action: 'confirmShift', teacherKey: key, selectionId, shiftId });
     alert(result.message || '已確認。');
-    await queryMySchedule();
+    await queryMySchedule({ refreshPublic: true });
   } catch (error) {
     alert(error.message);
   }
@@ -182,8 +216,7 @@ async function releaseMyShift(shiftId) {
   try {
     const result = await apiGet({ action: 'releaseShift', teacherKey: key, shiftId, note });
     alert(result.message || '已釋出，等待其他老師認領。');
-    await loadPublicData();
-    await queryMySchedule();
+    await queryMySchedule({ refreshPublic: true });
   } catch (error) {
     alert(error.message);
   }
@@ -200,8 +233,7 @@ async function cancelRelease(shiftId) {
   try {
     const result = await apiGet({ action: 'cancelRelease', teacherKey: key, shiftId });
     alert(result.message || '已取消釋出。');
-    await loadPublicData();
-    await queryMySchedule();
+    await queryMySchedule({ refreshPublic: true });
   } catch (error) {
     alert(error.message);
   }
@@ -218,8 +250,7 @@ async function claimReleasedShift(shiftId) {
   try {
     const result = await apiGet({ action: 'claimReleasedShift', teacherKey: key, shiftId });
     alert(result.message || '認領成功。');
-    await loadPublicData();
-    await queryMySchedule();
+    await queryMySchedule({ refreshPublic: true });
   } catch (error) {
     alert(error.message);
   }
@@ -230,7 +261,7 @@ async function setupBackend() {
   try {
     const data = await apiGet({ action: 'setup' });
     showApiStatus(data.message || '後端工作表已建立完成。', 'success-text');
-    await loadPublicData();
+    await loadPublicData({ forceRefresh: true });
   } catch (error) {
     showApiStatus('建立失敗：' + error.message, 'danger-text');
   }
@@ -241,7 +272,7 @@ async function importTeachers() {
   try {
     const data = await apiGet({ action: 'importTeachers' });
     showApiStatus(`匯入完成：新增 ${data.imported || 0} 位，目前共 ${data.totalTeachers || 0} 位。`, 'success-text');
-    await loadPublicData();
+    await loadPublicData({ forceRefresh: true });
   } catch (error) {
     showApiStatus('匯入失敗：' + error.message, 'danger-text');
   }
@@ -304,14 +335,14 @@ function renderShiftCalendar() {
     return;
   }
 
-  const shifts = (data.shifts || []).slice().sort(compareShift);
+  const shifts = data.sortedShifts || (data.shifts || []).slice().sort(compareShift);
   if (shifts.length === 0) {
     renderMessage('#shiftList', '目前沒有可顯示的班別。');
     return;
   }
 
   const monthInfo = getCalendarMonth(shifts);
-  const grouped = groupBy(shifts, (shift) => shift.date);
+  const grouped = data.shiftsByDate || groupBy(shifts, (shift) => shift.date);
   const firstDay = new Date(monthInfo.year, monthInfo.month - 1, 1);
   const daysInMonth = new Date(monthInfo.year, monthInfo.month, 0).getDate();
   const startWeekday = firstDay.getDay();
@@ -525,12 +556,18 @@ function renderMessage(selector, message) {
 }
 
 function findShift(shiftId) {
-  const shifts = state.publicData && state.publicData.shifts ? state.publicData.shifts : [];
+  const data = state.publicData;
+  if (!data) return null;
+  if (data.shiftById && data.shiftById[String(shiftId)]) return data.shiftById[String(shiftId)];
+  const shifts = data.shifts || [];
   return shifts.find((shift) => String(shift.shiftId) === String(shiftId)) || null;
 }
 
 function findRelease(shiftId) {
-  const releases = state.publicData && state.publicData.releases ? state.publicData.releases : [];
+  const data = state.publicData;
+  if (!data) return null;
+  if (data.releaseByShiftId && data.releaseByShiftId[String(shiftId)]) return data.releaseByShiftId[String(shiftId)];
+  const releases = data.releases || [];
   return releases.find((row) => String(row.originalShiftId) === String(shiftId) && String(row.status || 'open') === 'open') || null;
 }
 
@@ -749,10 +786,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const searchBtn = document.querySelector('#searchBtn');
   const input = document.querySelector('#queryInput');
 
-  if (refreshBtn) refreshBtn.addEventListener('click', loadPublicData);
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadPublicData({ forceRefresh: true }));
   if (setupBtn) setupBtn.addEventListener('click', setupBackend);
   if (importBtn) importBtn.addEventListener('click', importTeachers);
-  if (searchBtn) searchBtn.addEventListener('click', queryMySchedule);
+  if (searchBtn) searchBtn.addEventListener('click', () => queryMySchedule());
   if (input) {
     input.addEventListener('input', useTypedTeacherKey);
     input.addEventListener('keydown', (event) => {
